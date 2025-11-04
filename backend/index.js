@@ -40,7 +40,14 @@ app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // ---------- File upload ----------
-const upload = multer({ dest: "uploads/" });
+// Use memory storage since Vercel has read-only file system
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  },
+});
 
 // ---------- Test Airtable ----------
 app.get("/test-airtable", async (req, res) => {
@@ -75,34 +82,18 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
         .json({ error: "Missing required fields or NDA file" });
     }
 
-    if (!ndaFile.filename || !ndaFile.originalname) {
-      return res.status(400).json({ error: "NDA file upload failed" });
-    }
-
     // Validate file type and size
     if (ndaFile.mimetype !== "application/pdf") {
-      // Clean up temp file
-      if (ndaFile.path) {
-        fs.unlink(ndaFile.path, (err) => {
-          if (err) console.error("Failed to delete temp file:", err);
-        });
-      }
       return res.status(400).json({ error: "Only PDF files are allowed" });
     }
 
     if (ndaFile.size > 10 * 1024 * 1024) {
-      // Clean up temp file
-      if (ndaFile.path) {
-        fs.unlink(ndaFile.path, (err) => {
-          if (err) console.error("Failed to delete temp file:", err);
-        });
-      }
       return res.status(400).json({ error: "File too large (max 10MB)" });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create vendor record - ONLY use fields that exist in your Airtable
+    // Create vendor record - EXACTLY as before
     const createdRecord = await base("Vendors").create({
       "Vendor Name": vendorName,
       "Contact Person": contactPerson,
@@ -121,13 +112,6 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
         "Demo registration - File validated (Vercel deployment)",
     });
 
-    // Clean up temp file immediately since we're not storing it
-    if (ndaFile.path) {
-      fs.unlink(ndaFile.path, (err) => {
-        if (err) console.error("Failed to delete temp file:", err);
-      });
-    }
-
     res.json({
       success: true,
       message:
@@ -136,13 +120,6 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
     });
   } catch (error) {
     console.error("Registration error:", error);
-
-    // Clean up file if it exists
-    if (req.file && req.file.path) {
-      fs.unlink(req.file.path, (err) => {
-        if (err) console.error("Failed to delete temp file:", err);
-      });
-    }
 
     res
       .status(500)
@@ -299,27 +276,18 @@ app.post(
         return res.status(404).json({ error: "Vendor not found" });
       }
 
-      // For demo - validate files but don't store them
+      // Validate proposal file
       if (proposalFile) {
-        // Validate proposal file
         if (
           !proposalFile.mimetype.includes("pdf") &&
           !proposalFile.mimetype.includes("zip")
         ) {
-          // Clean up files
-          [proposalFile, ...supportingFiles].forEach((file) => {
-            if (file && file.path) fs.unlink(file.path, () => {});
-          });
           return res
             .status(400)
             .json({ error: "Proposal file must be PDF or ZIP" });
         }
 
         if (proposalFile.size > 50 * 1024 * 1024) {
-          // Clean up files
-          [proposalFile, ...supportingFiles].forEach((file) => {
-            if (file && file.path) fs.unlink(file.path, () => {});
-          });
           return res
             .status(400)
             .json({ error: "Proposal file too large (max 50MB)" });
@@ -341,16 +309,6 @@ app.post(
 
       const created = await base("Submissions").create(submissionData);
 
-      // Clean up temp files immediately
-      const allFiles = [proposalFile, ...supportingFiles].filter(Boolean);
-      allFiles.forEach((file) => {
-        if (file && file.path) {
-          fs.unlink(file.path, (err) => {
-            if (err) console.error("Failed to delete temp file:", err);
-          });
-        }
-      });
-
       res.json({
         success: true,
         message: "Proposal submitted successfully! (Files validated ✓)",
@@ -358,17 +316,6 @@ app.post(
       });
     } catch (error) {
       console.error("Proposal submission error:", error);
-
-      // Clean up any uploaded files on error
-      if (req.files) {
-        Object.values(req.files)
-          .flat()
-          .forEach((file) => {
-            if (file && file.path) {
-              fs.unlink(file.path, () => {});
-            }
-          });
-      }
 
       res.status(500).json({
         error: "Submission failed",
