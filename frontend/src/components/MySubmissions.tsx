@@ -1,5 +1,5 @@
 // frontend/src/components/MySubmissions.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { API_BASE } from "../config/api";
 import { useNavigate } from "react-router-dom";
@@ -10,14 +10,10 @@ import {
   DollarSign,
   Clock,
   Star,
-  AlertCircle,
   Search,
-  Filter,
-  ChevronDown,
   ExternalLink,
   Loader2,
   X,
-  CheckCircle,
   ArrowRight,
   Building2,
 } from "lucide-react";
@@ -116,7 +112,7 @@ export default function MySubmissions() {
         case "price":
           return b.basePrice - a.basePrice;
         case "rating":
-          const ratingOrder = {
+          const ratingOrder: { [key: string]: number } = {
             "5-Star": 5,
             "4-Star": 4,
             "3-Star": 3,
@@ -254,7 +250,6 @@ export default function MySubmissions() {
               onChange={(e) => setFilterStatus(e.target.value)}
               className="px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
             >
-              <Filter className="w-4 h-4" />
               <option value="all">All Status</option>
               <option value="Pending">Pending</option>
               <option value="Under Review">Under Review</option>
@@ -267,7 +262,6 @@ export default function MySubmissions() {
               onChange={(e) => setSortBy(e.target.value as any)}
               className="px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
             >
-              <ChevronDown className="w-4 h-4" />
               <option value="date">Latest First</option>
               <option value="price">Highest Price</option>
               <option value="rating">Best Rating</option>

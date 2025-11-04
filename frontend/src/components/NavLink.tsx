@@ -1,6 +1,6 @@
 // frontend/src/components/NavLink.tsx
 import React from "react";
-import { Link, useLocation, useMatch, type LinkProps } from "react-router-dom";
+import { Link, useMatch, type LinkProps } from "react-router-dom";
 import { cn } from "@/lib/utils"; // Optional: if using shadcn/ui or clsx
 import { ChevronRight } from "lucide-react";
 
@@ -26,8 +26,6 @@ export default function NavLink({
   end = false,
   ...props
 }: NavLinkProps) {
-  const location = useLocation();
-
   // Use useMatch for precise path matching
   const match = useMatch({
     path: to,

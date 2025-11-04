@@ -16,22 +16,17 @@ import {
   ArrowRight,
   ArrowLeft,
   Search,
-  Filter,
   X,
   Loader2,
   ChevronRight,
-  Building2,
   Target,
   Timer,
-  Users,
   BarChart3,
   TrendingUp,
   Eye,
-  Download,
   LogOut,
   Bell,
   Settings,
-  Shield,
 } from "lucide-react";
 import NavLink from "./NavLink";
 
@@ -264,7 +259,7 @@ export default function Dashboard() {
       );
     }).length;
 
-    const newThisWeek = sortedRFPs.filter((rfp) => {
+    const newThisWeek = sortedRFPs.filter(() => {
       // This would need creation date from API
       return true; // Placeholder
     }).length;
@@ -1061,7 +1056,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from {
             opacity: 0;

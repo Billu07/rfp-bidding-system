@@ -795,7 +795,7 @@ export default function RegisterVendor() {
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from {
             opacity: 0;

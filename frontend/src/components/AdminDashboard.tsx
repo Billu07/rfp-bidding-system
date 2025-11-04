@@ -28,15 +28,10 @@ import {
   X,
   Plus,
   Target,
-  Calendar as CalendarIcon,
-  DollarSign as DollarIcon,
   ClipboardList,
   UserCheck,
   FilePlus,
   Eye,
-  Filter,
-  ChevronDown,
-  MoreVertical,
   RefreshCw,
 } from "lucide-react";
 
@@ -380,7 +375,7 @@ export default function AdminDashboard() {
         case "price":
           return (b.basePrice || 0) - (a.basePrice || 0);
         case "rating":
-          const ratingOrder = {
+          const ratingOrder: { [key: string]: number } = {
             "5-Star": 5,
             "4-Star": 4,
             "3-Star": 3,
@@ -1184,13 +1179,13 @@ export default function AdminDashboard() {
 
                   <div className="space-y-3 text-sm text-gray-600 mb-4">
                     <div className="flex items-center gap-2">
-                      <CalendarIcon className="w-4 h-4 text-blue-600" />
+                      <Calendar className="w-4 h-4 text-blue-600" />
                       <span className="font-medium">Deadline:</span>
                       <span>{safeFormatDate(rfp["Submission Deadline"])}</span>
                     </div>
                     {rfp["Budget Guidance"] && (
                       <div className="flex items-center gap-2">
-                        <DollarIcon className="w-4 h-4 text-green-600" />
+                        <DollarSign className="w-4 h-4 text-green-600" />
                         <span className="font-medium">Budget:</span>
                         <span>{rfp["Budget Guidance"]}</span>
                       </div>
@@ -1516,7 +1511,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from {
             opacity: 0;
