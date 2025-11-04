@@ -29,7 +29,7 @@ const base = new Airtable({
 app.use(
   cors({
     origin: [
-      "https://rfp-frontend-1x9s7p85w-snows-projects-59aa3c4f.vercel.app/", // You'll update this after deployment
+      "https://rfp-frontend-weld.vercel.app", // Your actual frontend URL
       "http://localhost:3000",
       "http://localhost:5173",
     ],
