@@ -458,7 +458,7 @@ export default function RegisterVendor() {
                     materials.
                   </p>
                   <a
-                    href="/nda-template.pdf"
+                    href="/Atlas_NDA.pdf"
                     download
                     className="inline-flex items-center gap-3 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-all transform hover:scale-105 shadow-lg"
                   >

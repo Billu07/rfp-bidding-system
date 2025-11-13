@@ -1,4 +1,4 @@
-// frontend/src/components/MySubmissions.tsx
+// frontend/src/components/MySubmissions.tsx - ENHANCED WITH EDIT
 import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { API_BASE } from "../config/api";
@@ -11,23 +11,27 @@ import {
   Clock,
   Star,
   Search,
-  ExternalLink,
   Loader2,
   X,
   ArrowRight,
-  Building2,
+  Target,
+  Edit,
+  Eye,
 } from "lucide-react";
 
 interface Submission {
   id: string;
   rfpName: string;
-  basePrice: number;
-  currency: string;
-  timeline: number;
-  proposalUrl?: string;
-  rating?: string;
+  companyName: string;
+  contactPerson: string;
+  email: string;
   status: string;
   submittedAt: string;
+  rating?: string;
+  implementationTimeline?: string;
+  upfrontCost?: number;
+  monthlyCost?: number;
+  canEdit?: boolean; // New field to check if submission can be edited
 }
 
 // Safe date formatting functions
@@ -53,12 +57,23 @@ const formatDistanceSafely = (dateStr: string | undefined): string => {
   }
 };
 
+const formatPriceSafely = (price: number | undefined): string => {
+  return price === undefined || price === null
+    ? "Not specified"
+    : new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(price);
+};
+
 export default function MySubmissions() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [sortBy, setSortBy] = useState<"date" | "price" | "rating">("date");
+  const [sortBy, setSortBy] = useState<"date" | "cost">("date");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -74,7 +89,14 @@ export default function MySubmissions() {
       .get(`${API_BASE}/api/vendor/submissions`, { headers })
       .then((res) => {
         console.log("Submissions received:", res.data.submissions);
-        setSubmissions(res.data.submissions || []);
+        const submissionsWithEdit = (res.data.submissions || []).map(
+          (sub: Submission) => ({
+            ...sub,
+            // Allow editing if status is Pending or Under Review (within reasonable timeframe)
+            canEdit: sub.status === "Pending" || sub.status === "Under Review",
+          })
+        );
+        setSubmissions(submissionsWithEdit);
         setLoading(false);
       })
       .catch((err) => {
@@ -89,8 +111,11 @@ export default function MySubmissions() {
 
     // Search
     if (searchQuery) {
-      filtered = filtered.filter((s) =>
-        s.rfpName.toLowerCase().includes(searchQuery.toLowerCase())
+      filtered = filtered.filter(
+        (s) =>
+          s.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.contactPerson.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.rfpName.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -105,24 +130,13 @@ export default function MySubmissions() {
         case "date":
           const dateA = new Date(a.submittedAt).getTime();
           const dateB = new Date(b.submittedAt).getTime();
-          // Handle invalid dates by putting them at the end
           const validDateA = isNaN(dateA) ? -Infinity : dateA;
           const validDateB = isNaN(dateB) ? -Infinity : dateB;
           return validDateB - validDateA;
-        case "price":
-          return b.basePrice - a.basePrice;
-        case "rating":
-          const ratingOrder: { [key: string]: number } = {
-            "5-Star": 5,
-            "4-Star": 4,
-            "3-Star": 3,
-            "2-Star": 2,
-            "1-Star": 1,
-          };
-          return (
-            (ratingOrder[b.rating || ""] || 0) -
-            (ratingOrder[a.rating || ""] || 0)
-          );
+        case "cost":
+          const costA = a.upfrontCost || 0;
+          const costB = b.upfrontCost || 0;
+          return costB - costA;
         default:
           return 0;
       }
@@ -132,15 +146,17 @@ export default function MySubmissions() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-100 text-yellow-800 border border-yellow-200";
       case "Under Review":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 text-blue-800 border border-blue-200";
       case "Approved":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 border border-green-200";
+      case "Shortlisted":
+        return "bg-purple-100 text-purple-800 border border-purple-200";
       case "Rejected":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 border border-red-200";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 border border-gray-200";
     }
   };
 
@@ -155,6 +171,19 @@ export default function MySubmissions() {
         }`}
       />
     ));
+  };
+
+  const handleEditSubmission = (submissionId: string) => {
+    navigate(`/submissions/${submissionId}`);
+  };
+
+  const handleViewDetails = (submissionId: string) => {
+    // Navigate to a read-only view or same edit page but in view mode
+    navigate(`/submissions/${submissionId}?mode=view`);
+  };
+
+  const handleNewSubmission = () => {
+    navigate("/submit-proposal");
   };
 
   if (loading) {
@@ -177,14 +206,15 @@ export default function MySubmissions() {
             <div className="flex items-center space-x-8">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-white" />
+                  <Target className="w-6 h-6 text-white" />
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">
-                    My Submissions
+                    My Aviation RFP Submissions
                   </h1>
                   <p className="text-xs text-gray-500">
-                    {submissions.length} total
+                    {submissions.length} total submission
+                    {submissions.length !== 1 ? "s" : ""}
                   </p>
                 </div>
               </div>
@@ -193,23 +223,32 @@ export default function MySubmissions() {
                   href="/dashboard"
                   className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-white transition"
                 >
-                  Active RFPs
+                  Dashboard
                 </a>
                 <span className="px-4 py-2 text-sm font-bold text-blue-600 bg-white rounded-lg shadow-sm">
                   My Submissions
                 </span>
               </nav>
             </div>
-            <button
-              onClick={() => {
-                localStorage.removeItem("vendor");
-                navigate("/login");
-              }}
-              className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1 transition"
-            >
-              <X className="w-4 h-4" />
-              Logout
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleNewSubmission}
+                className="hidden sm:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition"
+              >
+                <FileText className="w-4 h-4" />
+                New Submission
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("vendor");
+                  navigate("/login");
+                }}
+                className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1 transition"
+              >
+                <X className="w-4 h-4" />
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -221,7 +260,7 @@ export default function MySubmissions() {
             href="/dashboard"
             className="flex-1 text-center py-2 text-sm font-medium rounded-lg"
           >
-            Active
+            Dashboard
           </a>
           <span className="flex-1 text-center py-2 text-sm font-bold text-blue-600 bg-blue-50 rounded-lg">
             Submissions
@@ -231,13 +270,51 @@ export default function MySubmissions() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900">
+            Private Aviation RFP Submissions
+          </h2>
+          <p className="text-gray-600 mt-2">
+            Track your aviation workflow modernization proposals
+          </p>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-600">Total Submissions</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {submissions.length}
+            </p>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-600">Pending Review</p>
+            <p className="text-2xl font-bold text-yellow-600">
+              {submissions.filter((s) => s.status === "Pending").length}
+            </p>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-600">Under Review</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {submissions.filter((s) => s.status === "Under Review").length}
+            </p>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-600">Editable</p>
+            <p className="text-2xl font-bold text-green-600">
+              {submissions.filter((s) => s.canEdit).length}
+            </p>
+          </div>
+        </div>
+
         {/* Filters & Search */}
         <div className="mb-8 flex flex-col sm:flex-row gap-4 items-center justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search submissions..."
+              placeholder="Search by company, contact, or RFP..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
@@ -253,6 +330,7 @@ export default function MySubmissions() {
               <option value="all">All Status</option>
               <option value="Pending">Pending</option>
               <option value="Under Review">Under Review</option>
+              <option value="Shortlisted">Shortlisted</option>
               <option value="Approved">Approved</option>
               <option value="Rejected">Rejected</option>
             </select>
@@ -263,9 +341,16 @@ export default function MySubmissions() {
               className="px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
             >
               <option value="date">Latest First</option>
-              <option value="price">Highest Price</option>
-              <option value="rating">Best Rating</option>
+              <option value="cost">Highest Cost</option>
             </select>
+
+            <button
+              onClick={handleNewSubmission}
+              className="sm:hidden flex items-center gap-2 px-4 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition"
+            >
+              <FileText className="w-4 h-4" />
+              New
+            </button>
           </div>
         </div>
 
@@ -278,7 +363,7 @@ export default function MySubmissions() {
             <p className="text-gray-500 text-lg">
               {searchQuery || filterStatus !== "all"
                 ? "No submissions match your filters"
-                : "You haven't submitted any proposals yet"}
+                : "You haven't submitted any aviation RFP proposals yet"}
             </p>
             {(searchQuery || filterStatus !== "all") && (
               <button
@@ -292,13 +377,13 @@ export default function MySubmissions() {
               </button>
             )}
             {!searchQuery && filterStatus === "all" && (
-              <a
-                href="/dashboard"
+              <button
+                onClick={handleNewSubmission}
                 className="mt-4 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
               >
-                Browse Active RFPs
+                Submit Aviation RFP Proposal
                 <ArrowRight className="w-4 h-4" />
-              </a>
+              </button>
             )}
           </div>
         ) : (
@@ -309,16 +394,16 @@ export default function MySubmissions() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      RFP
+                      Company & Contact
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Submitted
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Price
+                      Timeline
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Timeline
+                      Costs
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Status
@@ -326,8 +411,8 @@ export default function MySubmissions() {
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Rating
                     </th>
-                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Proposal
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -336,8 +421,14 @@ export default function MySubmissions() {
                     <tr key={s.id} className="hover:bg-gray-50 transition">
                       <td className="px-6 py-5">
                         <div>
-                          <p className="text-sm font-semibold text-gray-900 line-clamp-2">
-                            {s.rfpName}
+                          <p className="text-sm font-semibold text-gray-900">
+                            {s.companyName}
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {s.contactPerson} • {s.email}
+                          </p>
+                          <p className="text-xs text-blue-600 font-medium mt-1">
+                            {s.rfpName || "Private Aviation RFP"}
                           </p>
                         </div>
                       </td>
@@ -351,15 +442,21 @@ export default function MySubmissions() {
                         </p>
                       </td>
                       <td className="px-6 py-5">
-                        <div className="flex items-center gap-1 text-sm font-medium">
-                          <DollarSign className="w-4 h-4 text-green-600" />
-                          {s.basePrice.toLocaleString()} {s.currency}
+                        <div className="flex items-center gap-1 text-sm">
+                          <Clock className="w-4 h-4 text-blue-600" />
+                          {s.implementationTimeline || "Not specified"}
                         </div>
                       </td>
                       <td className="px-6 py-5">
-                        <div className="flex items-center gap-1 text-sm">
-                          <Clock className="w-4 h-4 text-blue-600" />
-                          {s.timeline} days
+                        <div className="space-y-1 text-sm">
+                          <div className="flex items-center gap-1 font-medium">
+                            <DollarSign className="w-4 h-4 text-green-600" />
+                            Upfront: {formatPriceSafely(s.upfrontCost)}
+                          </div>
+                          <div className="flex items-center gap-1 text-gray-600">
+                            <DollarSign className="w-4 h-4 text-blue-600" />
+                            Monthly: {formatPriceSafely(s.monthlyCost)}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-5">
@@ -385,20 +482,25 @@ export default function MySubmissions() {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-5 text-right">
-                        {s.proposalUrl ? (
-                          <a
-                            href={s.proposalUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium text-sm"
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleViewDetails(s.id)}
+                            className="p-2 text-gray-400 hover:text-blue-600 transition"
+                            title="View Details"
                           >
-                            View
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {s.canEdit && (
+                            <button
+                              onClick={() => handleEditSubmission(s.id)}
+                              className="p-2 text-gray-400 hover:text-green-600 transition"
+                              title="Edit Submission"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

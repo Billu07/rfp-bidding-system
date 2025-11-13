@@ -1,4 +1,4 @@
-// frontend/src/components/Login.tsx
+// frontend/src/components/Login.tsx - UPDATED FOR BRAND ANONYMITY
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { API_BASE } from "../config/api";
@@ -12,12 +12,12 @@ import {
   EyeOff,
   ArrowRight,
   Building2,
-  Users,
-  Target,
   Shield,
   CheckCircle2,
-  ArrowLeft,
   Sparkles,
+  UserCog,
+  Key,
+  Briefcase,
 } from "lucide-react";
 
 export default function Login() {
@@ -29,19 +29,20 @@ export default function Login() {
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockTime, setLockTime] = useState(0);
+  const [activeTab, setActiveTab] = useState<"vendor" | "admin">("vendor");
   const navigate = useNavigate();
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus email on load
   useEffect(() => {
     emailInputRef.current?.focus();
-  }, []);
+  }, [activeTab]);
 
   // Rate limiting and lockout
   useEffect(() => {
     if (loginAttempts >= 5) {
       setIsLocked(true);
-      setLockTime(30); // 30 seconds lockout
+      setLockTime(30);
 
       const timer = setInterval(() => {
         setLockTime((prev) => {
@@ -77,41 +78,63 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await axios.post(
-        `${API_BASE}/api/login`,
-        {
-          email: email.trim().toLowerCase(),
-          password,
-        },
-        {
-          timeout: 15000,
-          headers: {
-            "X-Requested-With": "XMLHttpRequest",
+      if (activeTab === "vendor") {
+        // Vendor login
+        const res = await axios.post(
+          `${API_BASE}/api/login`,
+          {
+            email: email.trim().toLowerCase(),
+            password,
           },
+          {
+            timeout: 15000,
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+            },
+          }
+        );
+
+        if (res.data.success) {
+          const vendorData = {
+            ...res.data.vendor,
+            loginTime: Date.now(),
+            sessionId: Math.random().toString(36).substr(2, 9),
+          };
+
+          localStorage.setItem("vendor", JSON.stringify(vendorData));
+          localStorage.setItem("vendor_session", "active");
+          navigate("/dashboard", { replace: true });
+        } else {
+          throw new Error(res.data.error || "Login failed");
         }
-      );
-
-      if (res.data.success) {
-        // Secure session storage
-        const vendorData = {
-          ...res.data.vendor,
-          loginTime: Date.now(),
-          sessionId: Math.random().toString(36).substr(2, 9),
-        };
-
-        localStorage.setItem("vendor", JSON.stringify(vendorData));
-        localStorage.setItem("vendor_session", "active");
-
-        // Redirect with replace (no back button)
-        navigate("/dashboard", { replace: true });
       } else {
-        throw new Error(res.data.error || "Login failed");
+        // Admin login
+        const res = await axios.post(
+          `${API_BASE}/api/admin/login`,
+          {
+            email: email.trim().toLowerCase(),
+            password,
+          },
+          {
+            timeout: 15000,
+          }
+        );
+
+        if (res.data.success) {
+          localStorage.setItem("admin", JSON.stringify(res.data.admin));
+          navigate("/admin/dashboard", { replace: true });
+        } else {
+          throw new Error(res.data.error || "Admin login failed");
+        }
       }
     } catch (err: any) {
       const attempts = loginAttempts + 1;
       setLoginAttempts(attempts);
 
-      let errorMessage = "Invalid credentials. Please try again.";
+      let errorMessage =
+        activeTab === "vendor"
+          ? "Invalid credentials. Please try again."
+          : "Invalid admin credentials.";
 
       if (err.code === "ECONNABORTED" || err.response?.status === 408) {
         errorMessage = "Request timeout. Please check your connection.";
@@ -120,13 +143,15 @@ export default function Login() {
       } else if (err.response?.data?.error) {
         errorMessage = err.response.data.error;
 
-        // Handle account status errors
-        if (err.response.data.status === "Pending Approval") {
-          errorMessage =
-            "Your account is pending admin approval. You'll receive an email once approved.";
-        } else if (err.response.data.status === "Declined") {
-          errorMessage =
-            "Your account has been declined. Please contact support for more information.";
+        // Handle vendor account status errors
+        if (activeTab === "vendor") {
+          if (err.response.data.status === "Pending Approval") {
+            errorMessage =
+              "Your account is pending admin approval. You'll receive an email once approved.";
+          } else if (err.response.data.status === "Declined") {
+            errorMessage =
+              "Your account has been declined. Please contact support for more information.";
+          }
         }
       }
 
@@ -175,24 +200,25 @@ export default function Login() {
               </div>
               <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Atlas RFP
+                  Private Aviation RFP Portal
                 </h1>
                 <p className="text-gray-600 text-sm font-medium">
-                  Vendor Portal
+                  Secure Access Gateway
                 </p>
               </div>
             </div>
 
             <h2 className="text-5xl lg:text-6xl font-bold leading-tight">
-              Access Your
+              Welcome to
               <span className="block bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Opportunities
+                Aviation RFP
               </span>
             </h2>
 
             <p className="text-xl text-gray-600 leading-relaxed max-w-lg">
-              Sign in to discover exclusive RFPs, submit winning proposals, and
-              grow your business with leading enterprises.
+              Access your dedicated portal. Vendors can submit proposals, admins
+              can manage the RFP process for a luxury credit card and concierge
+              company.
             </p>
           </div>
 
@@ -200,24 +226,24 @@ export default function Login() {
           <div className="space-y-4">
             <div className="flex items-center gap-4 text-gray-700">
               <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Target className="w-5 h-5 text-blue-600" />
+                <Briefcase className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="font-semibold">Exclusive RFP Access</p>
+                <p className="font-semibold">For Vendors</p>
                 <p className="text-sm text-gray-600">
-                  Premium opportunities from top companies
+                  Access RFPs, submit proposals, track submissions
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-4 text-gray-700">
               <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                <Users className="w-5 h-5 text-purple-600" />
+                <UserCog className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <p className="font-semibold">Vetted Network</p>
+                <p className="font-semibold">For Administrators</p>
                 <p className="text-sm text-gray-600">
-                  Join trusted vendors in our secure ecosystem
+                  Manage vendors, review submissions, create RFPs
                 </p>
               </div>
             </div>
@@ -227,9 +253,9 @@ export default function Login() {
                 <Sparkles className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="font-semibold">Streamlined Process</p>
+                <p className="font-semibold">Secure & Efficient</p>
                 <p className="text-sm text-gray-600">
-                  Quick submissions with professional templates
+                  End-to-end encrypted, streamlined workflows
                 </p>
               </div>
             </div>
@@ -246,7 +272,7 @@ export default function Login() {
             <div className="px-4 py-2 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 flex items-center gap-2 shadow-sm">
               <CheckCircle2 className="w-4 h-4 text-blue-500" />
               <span className="text-sm font-medium text-gray-700">
-                Secure Bidding
+                Secure Access
               </span>
             </div>
             <div className="px-4 py-2 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 flex items-center gap-2 shadow-sm">
@@ -263,16 +289,68 @@ export default function Login() {
           <div className="w-full max-w-md">
             {/* Login Card */}
             <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-gray-200/60">
+              {/* Tab Selection */}
+              <div className="flex gap-2 mb-8 bg-gray-100/80 p-1.5 rounded-2xl">
+                <button
+                  onClick={() => {
+                    setActiveTab("vendor");
+                    setError("");
+                    setEmail("");
+                    setPassword("");
+                  }}
+                  className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all ${
+                    activeTab === "vendor"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 justify-center">
+                    <Briefcase className="w-4 h-4" />
+                    Vendor Login
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab("admin");
+                    setError("");
+                    setEmail("");
+                    setPassword("");
+                  }}
+                  className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all ${
+                    activeTab === "admin"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 justify-center">
+                    <UserCog className="w-4 h-4" />
+                    Admin Login
+                  </div>
+                </button>
+              </div>
+
               {/* Header */}
               <div className="text-center mb-8">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg mb-4">
-                  <Lock className="w-7 h-7 text-white" />
+                <div
+                  className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center shadow-lg mb-4 ${
+                    activeTab === "vendor"
+                      ? "bg-gradient-to-r from-blue-600 to-purple-600"
+                      : "bg-gradient-to-r from-orange-600 to-red-600"
+                  }`}
+                >
+                  {activeTab === "vendor" ? (
+                    <Lock className="w-7 h-7 text-white" />
+                  ) : (
+                    <Key className="w-7 h-7 text-white" />
+                  )}
                 </div>
                 <h1 className="text-2xl font-bold text-gray-900">
-                  Welcome Back
+                  {activeTab === "vendor" ? "Vendor Portal" : "Admin Portal"}
                 </h1>
                 <p className="text-gray-600 mt-2">
-                  Sign in to your vendor account
+                  {activeTab === "vendor"
+                    ? "Sign in to your vendor account"
+                    : "Administrative access only"}
                 </p>
               </div>
 
@@ -297,7 +375,11 @@ export default function Login() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full pl-11 pr-4 py-3.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition placeholder-gray-400 bg-white/50 backdrop-blur-sm"
-                      placeholder="you@company.com"
+                      placeholder={
+                        activeTab === "vendor"
+                          ? "you@company.com"
+                          : "admin@company.com"
+                      }
                       required
                       autoComplete="email"
                       disabled={isLocked || loading}
@@ -314,7 +396,7 @@ export default function Login() {
                     >
                       Password
                     </label>
-                    {password && (
+                    {password && activeTab === "vendor" && (
                       <div className="flex items-center gap-2">
                         <div
                           className={`w-2 h-2 rounded-full ${
@@ -392,9 +474,19 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading || isLocked || !email || !password}
-                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-3 shadow-lg group relative overflow-hidden"
+                  className={`w-full py-4 text-white font-bold rounded-xl focus:outline-none focus:ring-4 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-3 shadow-lg group relative overflow-hidden ${
+                    activeTab === "vendor"
+                      ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:ring-blue-100"
+                      : "bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 focus:ring-orange-100"
+                  }`}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div
+                    className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+                      activeTab === "vendor"
+                        ? "bg-gradient-to-r from-blue-500 to-purple-500"
+                        : "bg-gradient-to-r from-orange-500 to-red-500"
+                    }`}
+                  ></div>
                   {loading ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin relative z-10" />
@@ -403,7 +495,9 @@ export default function Login() {
                   ) : (
                     <>
                       <span className="relative z-10">
-                        Sign In to Dashboard
+                        {activeTab === "vendor"
+                          ? "Sign In to Vendor Portal"
+                          : "Sign In to Admin Portal"}
                       </span>
                       <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
                     </>
@@ -413,30 +507,30 @@ export default function Login() {
 
               {/* Footer Links */}
               <div className="mt-8 text-center space-y-4">
-                <p className="text-sm text-gray-600">
-                  Not registered yet?{" "}
-                  <Link
-                    to="/register"
-                    className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition"
-                  >
-                    Register as Vendor
-                  </Link>
-                </p>
+                {activeTab === "vendor" && (
+                  <p className="text-sm text-gray-600">
+                    Not registered yet?{" "}
+                    <Link
+                      to="/register"
+                      className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition"
+                    >
+                      Register as Vendor
+                    </Link>
+                  </p>
+                )}
 
                 <div className="pt-4 border-t border-gray-200">
-                  <Link
-                    to="/"
-                    className="text-sm text-gray-500 hover:text-gray-700 font-medium transition inline-flex items-center gap-1"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back to Homepage
-                  </Link>
+                  <p className="text-xs text-gray-500">
+                    {activeTab === "vendor"
+                      ? "Secure vendor portal access"
+                      : "Restricted administrative access"}
+                  </p>
                 </div>
 
                 <p className="text-xs text-gray-500 pt-2">
                   Need help?{" "}
                   <a
-                    href="mailto:support@atlasrfp.com"
+                    href="mailto:support@aviationrfp.com"
                     className="text-blue-600 hover:underline font-medium"
                   >
                     Contact support

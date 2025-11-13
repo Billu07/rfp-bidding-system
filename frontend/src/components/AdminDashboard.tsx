@@ -48,6 +48,10 @@ interface Vendor {
   "NDA Document"?: { url: string }[];
   "NDA Upload Date"?: string;
   Status?: string;
+  // Add these new Cloudinary fields:
+  "NDA Cloudinary URL"?: string;
+  "NDA Cloudinary Public ID"?: string;
+  "NDA View URL"?: string;
 }
 
 interface Submission {
@@ -932,16 +936,23 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3">
-                      {v["NDA Document"]?.[0] && (
+                      {/* NDA Preview Button - Using simple Cloudinary URL */}
+                      {(v["NDA Cloudinary URL"] || v["NDA View URL"]) && (
                         <button
                           onClick={() =>
-                            setShowNdaPreview(v["NDA Document"]![0].url)
+                            setShowNdaPreview(
+                              v["NDA View URL"] ||
+                                v["NDA Cloudinary URL"] ||
+                                null
+                            )
                           }
-                          className="px-5 py-2.5 bg-blue-100 text-blue-700 font-semibold rounded-xl hover:bg-blue-200 transition flex items-center gap-2 border border-blue-200"
+                          className="px-5 py-2.5 bg-blue-100 text-blue-700 font-semibold rounded-xl hover:bg-blue-200 transition flex items-center gap-2 border border-blue-200 hover:shadow-md"
                         >
-                          <Eye className="w-4 h-4" /> View NDA
+                          <Eye className="w-4 h-4" />
+                          Review NDA
                         </button>
                       )}
+
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleVendorAction(v.id, "approve")}
@@ -1243,42 +1254,72 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* NDA Preview Modal */}
+      {/* Enhanced NDA Preview Modal */}
       {showNdaPreview && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-scaleIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden animate-scaleIn flex flex-col">
             <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900">
-                NDA Document Preview
-              </h3>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  NDA Document Preview
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Review vendor's signed NDA before approval
+                </p>
+              </div>
               <button
                 onClick={() => setShowNdaPreview(null)}
-                className="text-gray-400 hover:text-gray-600 transition"
+                className="text-gray-400 hover:text-gray-600 transition p-2 hover:bg-gray-100 rounded-lg"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="p-6">
-              <iframe
-                src={showNdaPreview}
-                className="w-full h-96 border-2 border-gray-200 rounded-xl"
-                title="NDA Preview"
-              />
+
+            {/* PDF Viewer Section with Google Docs */}
+            <div className="flex-1 p-6 min-h-[500px]">
+              {showNdaPreview ? (
+                <div className="w-full h-full border-2 border-gray-200 rounded-xl overflow-hidden">
+                  <iframe
+                    src={`https://docs.google.com/gview?url=${encodeURIComponent(
+                      showNdaPreview
+                    )}&embedded=true`}
+                    className="w-full h-full"
+                    title="NDA Document Preview"
+                    style={{ minHeight: "500px" }}
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <FileText className="w-16 h-16 mb-4" />
+                  <p>Unable to load NDA document</p>
+                </div>
+              )}
             </div>
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
-              <a
-                href={showNdaPreview}
-                download
-                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:shadow-lg transition flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" /> Download
-              </a>
-              <button
-                onClick={() => setShowNdaPreview(null)}
-                className="px-5 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition"
-              >
-                Close
-              </button>
+
+            <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-gray-50">
+              <div className="text-sm text-gray-600">
+                <p>Review the NDA document before approving the vendor.</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  The vendor will not be able to submit proposals until
+                  approved.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <a
+                  href={showNdaPreview || "#"}
+                  download="vendor-nda-document.pdf"
+                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:shadow-lg transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={(e) => !showNdaPreview && e.preventDefault()}
+                >
+                  <Download className="w-4 h-4" /> Download NDA
+                </a>
+                <button
+                  onClick={() => setShowNdaPreview(null)}
+                  className="px-5 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-100 transition"
+                >
+                  Close Preview
+                </button>
+              </div>
             </div>
           </div>
         </div>
