@@ -113,6 +113,56 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
       return res.status(400).json({ error: "NDA file too large (max 10MB)" });
     }
 
+    // ✅ CHECK FOR EXISTING VENDOR WITH SAME EMAIL
+    console.log("🔍 Checking for existing vendor with email:", email);
+    const existingVendors = await base("Vendors")
+      .select({
+        filterByFormula: `{Email} = '${email}'`,
+        fields: ["Email", "Status", "Vendor Name"],
+      })
+      .all();
+
+    if (existingVendors.length > 0) {
+      console.log(
+        "❌ Duplicate email found:",
+        existingVendors.length,
+        "existing vendors"
+      );
+
+      // Check if any existing vendor is approved or pending
+      const approvedVendor = existingVendors.find(
+        (v) => v.fields["Status"] === "Approved"
+      );
+      const pendingVendor = existingVendors.find(
+        (v) => v.fields["Status"] === "Pending Approval"
+      );
+
+      if (approvedVendor) {
+        return res.status(409).json({
+          error:
+            "An account with this email already exists and is approved. Please use the login page instead.",
+          existingStatus: "approved",
+        });
+      }
+
+      if (pendingVendor) {
+        return res.status(409).json({
+          error:
+            "An account with this email is already pending approval. Please wait for admin approval or contact support.",
+          existingStatus: "pending",
+        });
+      }
+
+      // If all are declined, still prevent registration to avoid duplicates
+      return res.status(409).json({
+        error:
+          "An account with this email already exists. Please contact support for assistance.",
+        existingStatus: "exists",
+      });
+    }
+
+    console.log("✅ No existing vendor found, proceeding with registration");
+
     // Upload NDA to Cloudinary as RAW file
     let cloudinaryResult;
     try {
@@ -147,6 +197,8 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
       Status: "Pending Approval",
     });
 
+    console.log("✅ New vendor registered successfully:", createdRecord.id);
+
     res.json({
       success: true,
       message:
@@ -156,6 +208,15 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
     });
   } catch (error) {
     console.error("Registration error:", error);
+
+    // Handle specific Airtable errors
+    if (error.error === "UNKNOWN_FIELD_NAME") {
+      return res.status(500).json({
+        error: "Database configuration error. Please contact support.",
+        details: "Field not found in database",
+      });
+    }
+
     res.status(500).json({
       error: "Registration failed",
       details: error.message,
@@ -163,7 +224,7 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
   }
 });
 
-// ---------- Vendor Login (Check Approval Status) ----------
+// ---------- Vendor Login (Check Approval Status) - DEBUG VERSION ----------
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -172,6 +233,7 @@ app.post("/api/login", async (req, res) => {
       return res.status(400).json({ error: "Email and password required" });
     }
 
+    // Get ALL vendors with ALL fields for debugging
     const allVendors = await base("Vendors")
       .select({
         fields: [
@@ -184,6 +246,17 @@ app.post("/api/login", async (req, res) => {
         ],
       })
       .all();
+
+    console.log("📊 Total vendors in database:", allVendors.length);
+
+    allVendors.forEach((v, index) => {
+      console.log(`Vendor ${index}:`, {
+        id: v.id,
+        email: v.fields["Email"],
+        status: v.fields["Status"],
+        name: v.fields["Vendor Name"],
+      });
+    });
 
     const vendor = allVendors.find((v) => {
       const dbEmail = v.fields["Email"];
@@ -198,8 +271,14 @@ app.post("/api/login", async (req, res) => {
     }
 
     const fields = vendor.fields;
+    console.log("✅ Vendor found:", {
+      id: vendor.id, // Record ID
+      email: fields["Email"],
+      status: fields["Status"],
+      statusType: typeof fields["Status"],
+      name: fields["Vendor Name"],
+    });
 
-    // Check approval status
     if (fields["Status"] === "Pending Approval") {
       return res.status(403).json({
         error:
@@ -217,7 +296,7 @@ app.post("/api/login", async (req, res) => {
 
     if (fields["Status"] !== "Approved") {
       return res.status(403).json({
-        error: "Account not approved",
+        error: "Account not approved - Status: " + fields["Status"],
         status: fields["Status"],
       });
     }
@@ -246,7 +325,7 @@ app.post("/api/login", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("💥 Login error:", error);
     res.status(500).json({ error: "Server error", details: error.message });
   }
 });
@@ -553,7 +632,7 @@ app.post("/api/submit-proposal", verifyVendor, async (req, res) => {
 
     // Create submission record
     const submissionData = {
-      Vendor: [vendorId],
+      "Vendor ID": [vendorId],
       "Company Name": companyName,
       Website: website,
       "Contact Person": contactPerson,
@@ -612,16 +691,82 @@ app.post("/api/submit-proposal", verifyVendor, async (req, res) => {
   }
 });
 
+// Add to backend/index.js - Debug endpoint
+app.get("/api/debug/vendor-submissions", verifyVendor, async (req, res) => {
+  try {
+    const vendorId = req.vendor.id;
+    console.log("🔍 DEBUG: Checking submissions for vendor:", vendorId);
+
+    // Get all submissions
+    const records = await base("Submissions")
+      .select({
+        fields: [
+          "id",
+          "Vendor",
+          "Company Name",
+          "Contact Person",
+          "Review Status",
+          "Submission Date",
+        ],
+      })
+      .all();
+
+    console.log("📊 Total submissions in database:", records.length);
+
+    // Find submissions for this vendor
+    const vendorSubmissions = records.filter((record) => {
+      const vendorField = record.fields["Vendor"];
+      console.log(`Checking submission ${record.id}:`, vendorField);
+
+      if (Array.isArray(vendorField) && vendorField.length > 0) {
+        const linkedVendorId =
+          typeof vendorField[0] === "string"
+            ? vendorField[0]
+            : vendorField[0]?.id;
+        console.log(
+          `  Linked vendor ID: ${linkedVendorId}, Current vendor ID: ${vendorId}`
+        );
+        return linkedVendorId === vendorId;
+      }
+      return false;
+    });
+
+    console.log("✅ Found submissions for vendor:", vendorSubmissions.length);
+
+    res.json({
+      vendorId,
+      totalSubmissions: records.length,
+      vendorSubmissionsCount: vendorSubmissions.length,
+      vendorSubmissions: vendorSubmissions.map((s) => ({
+        id: s.id,
+        companyName: s.fields["Company Name"],
+        status: s.fields["Review Status"],
+        submittedAt: s.fields["Submission Date"],
+        vendorField: s.fields["Vendor"],
+      })),
+      allSubmissions: records.map((r) => ({
+        id: r.id,
+        companyName: r.fields["Company Name"],
+        vendorField: r.fields["Vendor"],
+      })),
+    });
+  } catch (error) {
+    console.error("Debug error:", error);
+    res.status(500).json({ error: "Debug failed" });
+  }
+});
+
 // ---------- Get Vendor's Aviation RFP Submissions ----------
 app.get("/api/vendor/submissions", verifyVendor, async (req, res) => {
   try {
     const vendorId = req.vendor.id;
+    console.log("🔍 Getting submissions for vendor:", vendorId);
 
-    // Get all submissions for this vendor
-    const records = await base("Submissions")
+    // Get all submissions and filter manually (more reliable)
+    const allRecords = await base("Submissions")
       .select({
-        filterByFormula: `{Vendor} = '${vendorId}'`,
         fields: [
+          "Vendor ID", // Changed from "Vendor" to "Vendor ID"
           "Company Name",
           "Contact Person",
           "Email",
@@ -630,16 +775,41 @@ app.get("/api/vendor/submissions", verifyVendor, async (req, res) => {
           "Implementation Timeline",
           "Upfront Cost",
           "Monthly Cost",
+          "RFP Type",
         ],
         sort: [{ field: "Submission Date", direction: "desc" }],
       })
       .all();
 
-    const submissions = records.map((record) => {
+    console.log("📊 Total submissions found:", allRecords.length);
+
+    // Manual filter for vendor submissions
+    const vendorSubmissions = allRecords.filter((record) => {
+      const vendorField = record.fields["Vendor ID"]; // Changed to "Vendor ID"
+
+      if (Array.isArray(vendorField) && vendorField.length > 0) {
+        const linkedVendorId =
+          typeof vendorField[0] === "string"
+            ? vendorField[0]
+            : vendorField[0]?.id;
+        console.log(
+          `  Submission ${record.id} linked to vendor: ${linkedVendorId}`
+        );
+        return linkedVendorId === vendorId;
+      }
+      return false;
+    });
+
+    console.log(
+      "✅ Vendor submissions after filter:",
+      vendorSubmissions.length
+    );
+
+    const submissions = vendorSubmissions.map((record) => {
       const fields = record.fields;
       return {
         id: record.id,
-        rfpName: "Private Aviation RFP",
+        rfpName: fields["RFP Type"] || "Private Aviation RFP",
         companyName: fields["Company Name"],
         contactPerson: fields["Contact Person"],
         email: fields["Email"],
@@ -654,6 +824,11 @@ app.get("/api/vendor/submissions", verifyVendor, async (req, res) => {
     res.json({
       success: true,
       submissions: submissions,
+      debug: {
+        totalRecords: allRecords.length,
+        vendorSubmissions: vendorSubmissions.length,
+        vendorId: vendorId,
+      },
     });
   } catch (error) {
     console.error("Fetch submissions error:", error);
@@ -671,11 +846,11 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
     const record = await base("Submissions").find(submissionId);
     const fields = record.fields;
 
-    // Verify the submission belongs to the vendor
-    const submissionVendorId = Array.isArray(fields["Vendor"])
-      ? typeof fields["Vendor"][0] === "string"
-        ? fields["Vendor"][0]
-        : fields["Vendor"][0]?.id
+    // ✅ FIX: Use consistent field name - change "Vendor" to "Vendor ID"
+    const submissionVendorId = Array.isArray(fields["Vendor ID"]) // Changed from "Vendor"
+      ? typeof fields["Vendor ID"][0] === "string"
+        ? fields["Vendor ID"][0]
+        : fields["Vendor ID"][0]?.id
       : null;
 
     if (submissionVendorId !== vendorId) {
@@ -797,10 +972,10 @@ app.post("/api/update-submission/:id", verifyVendor, async (req, res) => {
 
     // Verify the submission exists and belongs to the vendor
     const existingRecord = await base("Submissions").find(submissionId);
-    const existingVendorId = Array.isArray(existingRecord.fields["Vendor"])
-      ? typeof existingRecord.fields["Vendor"][0] === "string"
-        ? existingRecord.fields["Vendor"][0]
-        : existingRecord.fields["Vendor"][0]?.id
+    const existingVendorId = Array.isArray(existingRecord.fields["Vendor ID"])
+      ? typeof existingRecord.fields["Vendor ID"][0] === "string"
+        ? existingRecord.fields["Vendor ID"][0]
+        : existingRecord.fields["Vendor ID"][0]?.id
       : null;
 
     if (existingVendorId !== vendorId) {
@@ -870,6 +1045,32 @@ app.post("/api/update-submission/:id", verifyVendor, async (req, res) => {
     });
   }
 });
+// Add to backend/index.js - Debug endpoint for submission data
+app.get("/api/debug/submission/:id", verifyVendor, async (req, res) => {
+  try {
+    const submissionId = req.params.id;
+    console.log("🔍 DEBUG: Checking submission:", submissionId);
+
+    const record = await base("Submissions").find(submissionId);
+    console.log("📊 Submission record found:", {
+      id: record.id,
+      fields: record.fields,
+      vendorField: record.fields["Vendor ID"], // Check the actual field name
+      companyName: record.fields["Company Name"],
+    });
+
+    res.json({
+      success: true,
+      record: {
+        id: record.id,
+        fields: record.fields,
+      },
+    });
+  } catch (error) {
+    console.error("Debug submission error:", error);
+    res.status(500).json({ error: "Debug failed" });
+  }
+});
 
 // ---------- ADMIN ROUTES ----------
 app.post("/api/admin/login", async (req, res) => {
@@ -917,6 +1118,671 @@ app.get("/api/admin/pending-vendors", async (req, res) => {
   } catch (error) {
     console.error("Failed to fetch vendors:", error);
     res.status(500).json({ error: "Failed to fetch vendors" });
+  }
+});
+
+// ---------- Admin: Clean Up Duplicate Vendors ----------
+app.get("/api/admin/duplicate-vendors", async (req, res) => {
+  try {
+    const allVendors = await base("Vendors")
+      .select({
+        fields: ["Email", "Status", "Vendor Name", "Created"],
+      })
+      .all();
+
+    // Group vendors by email
+    const emailGroups = {};
+    allVendors.forEach((vendor) => {
+      const email = vendor.fields["Email"];
+      if (!emailGroups[email]) {
+        emailGroups[email] = [];
+      }
+      emailGroups[email].push({
+        id: vendor.id,
+        email: email,
+        status: vendor.fields["Status"],
+        name: vendor.fields["Vendor Name"],
+        created: vendor.fields["Created"] || vendor._rawJson.createdTime,
+      });
+    });
+
+    // Find duplicates (emails with more than 1 vendor)
+    const duplicates = {};
+    Object.keys(emailGroups).forEach((email) => {
+      if (emailGroups[email].length > 1) {
+        duplicates[email] = emailGroups[email];
+      }
+    });
+
+    res.json({
+      success: true,
+      totalVendors: allVendors.length,
+      duplicateCount: Object.keys(duplicates).length,
+      duplicates: duplicates,
+    });
+  } catch (error) {
+    console.error("Duplicate vendors check error:", error);
+    res.status(500).json({ error: "Failed to check duplicates" });
+  }
+});
+
+// ---------- Get Vendor Questions & Answers ----------
+app.get("/api/vendor/questions", verifyVendor, async (req, res) => {
+  try {
+    const vendorId = req.vendor.id;
+    console.log("🔍 Getting questions for vendor:", vendorId);
+
+    // Get ALL submissions and filter manually
+    const allRecords = await base("Submissions")
+      .select({
+        fields: [
+          "Vendor ID",
+          "Company Name",
+          "Submission Date",
+          "Step 2 Questions",
+          "Step 3 Questions",
+          "Step 4 Questions",
+          "Step 2 Answers",
+          "Step 3 Answers",
+          "Step 4 Answers",
+          "Questions Last Updated",
+          "Vendor Viewed Answers",
+        ],
+      })
+      .all();
+
+    console.log("📊 Total submissions in database:", allRecords.length);
+
+    // CORRECTED: Proper vendor filtering using Vendor ID
+    const vendorSubmissions = allRecords.filter((record) => {
+      const vendorField = record.fields["Vendor ID"];
+
+      console.log(`Checking submission ${record.id}:`, {
+        vendorField: vendorField,
+        vendorFieldType: typeof vendorField,
+        isArray: Array.isArray(vendorField),
+        length: Array.isArray(vendorField) ? vendorField.length : 0,
+      });
+
+      if (Array.isArray(vendorField) && vendorField.length > 0) {
+        const linkedVendorId =
+          typeof vendorField[0] === "string"
+            ? vendorField[0]
+            : vendorField[0]?.id;
+
+        console.log(
+          `  Linked vendor: ${linkedVendorId}, Current vendor: ${vendorId}, Match: ${
+            linkedVendorId === vendorId
+          }`
+        );
+        return linkedVendorId === vendorId;
+      }
+      return false;
+    });
+
+    console.log(
+      "✅ Vendor submissions after filter:",
+      vendorSubmissions.length
+    );
+
+    // Transform data into Q&A format
+    const questions = [];
+
+    vendorSubmissions.forEach((submission) => {
+      const fields = submission.fields;
+      const submissionId = submission.id;
+      const companyName = fields["Company Name"];
+      const submittedAt = fields["Submission Date"];
+
+      console.log(`📝 Processing submission ${submissionId}:`, {
+        step2Q: fields["Step 2 Questions"] ? "YES" : "NO",
+        step2A: fields["Step 2 Answers"] ? "YES" : "NO",
+        step3Q: fields["Step 3 Questions"] ? "YES" : "NO",
+        step3A: fields["Step 3 Answers"] ? "YES" : "NO",
+        step4Q: fields["Step 4 Questions"] ? "YES" : "NO",
+        step4A: fields["Step 4 Answers"] ? "YES" : "NO",
+      });
+
+      // Step 2 Questions & Answers
+      if (fields["Step 2 Questions"]) {
+        questions.push({
+          id: `${submissionId}-step2`,
+          submissionId,
+          companyName,
+          submittedAt,
+          step: "Solution Fit & Use Cases",
+          question: fields["Step 2 Questions"],
+          answer: fields["Step 2 Answers"] || null,
+          askedAt: submittedAt,
+          answeredAt: fields["Step 2 Answers"]
+            ? fields["Questions Last Updated"]
+            : null,
+          hasNewAnswer: Boolean(
+            fields["Step 2 Answers"] && !fields["Vendor Viewed Answers"]
+          ),
+        });
+      }
+
+      // Step 3 Questions & Answers
+      if (fields["Step 3 Questions"]) {
+        questions.push({
+          id: `${submissionId}-step3`,
+          submissionId,
+          companyName,
+          submittedAt,
+          step: "Technical Capabilities & Compliance",
+          question: fields["Step 3 Questions"],
+          answer: fields["Step 3 Answers"] || null,
+          askedAt: submittedAt,
+          answeredAt: fields["Step 3 Answers"]
+            ? fields["Questions Last Updated"]
+            : null,
+          hasNewAnswer: Boolean(
+            fields["Step 3 Answers"] && !fields["Vendor Viewed Answers"]
+          ),
+        });
+      }
+
+      // Step 4 Questions & Answers
+      if (fields["Step 4 Questions"]) {
+        questions.push({
+          id: `${submissionId}-step4`,
+          submissionId,
+          companyName,
+          submittedAt,
+          step: "Implementation & Pricing",
+          question: fields["Step 4 Questions"],
+          answer: fields["Step 4 Answers"] || null,
+          askedAt: submittedAt,
+          answeredAt: fields["Step 4 Answers"]
+            ? fields["Questions Last Updated"]
+            : null,
+          hasNewAnswer: Boolean(
+            fields["Step 4 Answers"] && !fields["Vendor Viewed Answers"]
+          ),
+        });
+      }
+    });
+
+    // Sort by unanswered first, then date
+    questions.sort((a, b) => {
+      if (!a.answer && b.answer) return -1;
+      if (a.answer && !b.answer) return 1;
+      return new Date(b.askedAt) - new Date(a.askedAt);
+    });
+
+    const unreadCount = questions.filter((q) => q.hasNewAnswer).length;
+
+    console.log("🎯 Final questions result:", {
+      totalQuestions: questions.length,
+      unreadCount: unreadCount,
+      submissionsChecked: vendorSubmissions.length,
+      questionsWithAnswers: questions.filter((q) => q.answer).length,
+    });
+
+    res.json({
+      success: true,
+      questions,
+      unreadCount,
+    });
+  } catch (error) {
+    console.error("Get questions error:", error);
+    res.status(500).json({ error: "Failed to load questions" });
+  }
+});
+// ---------- Debug Vendor Submissions Field Names ----------
+app.get(
+  "/api/debug/vendor-submissions-fields",
+  verifyVendor,
+  async (req, res) => {
+    try {
+      const vendorId = req.vendor.id;
+
+      console.log("🔍 Debug: Checking submissions for vendor:", vendorId);
+
+      // Get all submissions to see field names
+      const allSubmissions = await base("Submissions")
+        .select({
+          maxRecords: 10,
+        })
+        .all();
+
+      console.log("📊 Total submissions in database:", allSubmissions.length);
+
+      // Check field names in first submission
+      if (allSubmissions.length > 0) {
+        const firstSubmission = allSubmissions[0];
+        console.log("🔍 First submission ID:", firstSubmission.id);
+        console.log(
+          "📝 First submission fields:",
+          Object.keys(firstSubmission.fields)
+        );
+        console.log("👤 Vendor field value:", firstSubmission.fields["Vendor"]);
+        console.log(
+          "👤 Vendor ID field value:",
+          firstSubmission.fields["Vendor ID"]
+        );
+      }
+
+      // Find submissions for this vendor using different field names
+      const submissionsWithVendor = allSubmissions.filter((record) => {
+        const vendorField = record.fields["Vendor"];
+        const vendorIdField = record.fields["Vendor ID"];
+
+        console.log(`Checking submission ${record.id}:`, {
+          vendorField,
+          vendorIdField,
+          vendorFieldType: typeof vendorField,
+          vendorIdFieldType: typeof vendorIdField,
+        });
+
+        // Check both possible field names
+        if (Array.isArray(vendorField) && vendorField.length > 0) {
+          const linkedVendorId =
+            typeof vendorField[0] === "string"
+              ? vendorField[0]
+              : vendorField[0]?.id;
+          return linkedVendorId === vendorId;
+        }
+
+        if (Array.isArray(vendorIdField) && vendorIdField.length > 0) {
+          const linkedVendorId =
+            typeof vendorIdField[0] === "string"
+              ? vendorIdField[0]
+              : vendorIdField[0]?.id;
+          return linkedVendorId === vendorId;
+        }
+
+        return false;
+      });
+
+      console.log(
+        "✅ Submissions found for vendor:",
+        submissionsWithVendor.length
+      );
+
+      res.json({
+        vendorId,
+        totalSubmissions: allSubmissions.length,
+        vendorSubmissions: submissionsWithVendor.length,
+        fieldNames:
+          allSubmissions.length > 0
+            ? Object.keys(allSubmissions[0].fields)
+            : [],
+        sampleSubmission:
+          allSubmissions.length > 0
+            ? {
+                id: allSubmissions[0].id,
+                vendorField: allSubmissions[0].fields["Vendor"],
+                vendorIdField: allSubmissions[0].fields["Vendor ID"],
+                companyName: allSubmissions[0].fields["Company Name"],
+              }
+            : null,
+      });
+    } catch (error) {
+      console.error("Debug error:", error);
+      res.status(500).json({ error: "Debug failed" });
+    }
+  }
+);
+
+// ---------- Admin: Get All Questions ----------
+app.get("/api/admin/questions", async (req, res) => {
+  try {
+    const submissions = await base("Submissions")
+      .select({
+        fields: [
+          "Vendor ID",
+          "Company Name",
+          "Submission Date",
+          "Step 2 Questions",
+          "Step 3 Questions",
+          "Step 4 Questions",
+          "Step 2 Answers",
+          "Step 3 Answers",
+          "Step 4 Answers",
+          "Questions Last Updated",
+          "Review Status",
+          "Vendor Viewed Answers",
+        ],
+      })
+      .all();
+
+    const questions = [];
+    const vendorIds = submissions
+      .map((s) => s.fields["Vendor ID"]?.[0]) // Changed to "Vendor ID"
+      .filter(Boolean);
+
+    let vendorMap = {};
+    if (vendorIds.length > 0) {
+      const vendors = await base("Vendors")
+        .select({
+          filterByFormula: `OR(${vendorIds
+            .map((id) => `RECORD_ID() = '${id}'`)
+            .join(",")})`,
+          fields: ["Vendor Name", "Email"],
+        })
+        .all();
+
+      vendorMap = Object.fromEntries(
+        vendors.map((v) => [
+          v.id,
+          { name: v.fields["Vendor Name"], email: v.fields["Email"] },
+        ])
+      );
+    }
+
+    submissions.forEach((submission) => {
+      const fields = submission.fields;
+      const submissionId = submission.id;
+      const vendorId = fields["Vendor ID"]?.[0]; // Changed to "Vendor ID"
+      const vendor = vendorMap[vendorId];
+
+      // Step 2
+      if (fields["Step 2 Questions"]) {
+        questions.push({
+          id: `${submissionId}-step2`,
+          submissionId,
+          vendor: vendor || { name: "Unknown Vendor", email: "" },
+          companyName: fields["Company Name"],
+          submittedAt: fields["Submission Date"],
+          step: "Solution Fit & Use Cases",
+          question: fields["Step 2 Questions"],
+          answer: fields["Step 2 Answers"] || null,
+          askedAt: fields["Submission Date"],
+          answeredAt: fields["Step 2 Answers"]
+            ? fields["Questions Last Updated"]
+            : null,
+          status: fields["Review Status"] || "Pending",
+          hasNewAnswer:
+            fields["Step 2 Answers"] && !fields["Vendor Viewed Answers"],
+        });
+      }
+
+      // Step 3
+      if (fields["Step 3 Questions"]) {
+        questions.push({
+          id: `${submissionId}-step3`,
+          submissionId,
+          vendor: vendor || { name: "Unknown Vendor", email: "" },
+          companyName: fields["Company Name"],
+          submittedAt: fields["Submission Date"],
+          step: "Technical Capabilities & Compliance",
+          question: fields["Step 3 Questions"],
+          answer: fields["Step 3 Answers"] || null,
+          askedAt: fields["Submission Date"],
+          answeredAt: fields["Step 3 Answers"]
+            ? fields["Questions Last Updated"]
+            : null,
+          status: fields["Review Status"] || "Pending",
+          hasNewAnswer:
+            fields["Step 3 Answers"] && !fields["Vendor Viewed Answers"],
+        });
+      }
+
+      // Step 4
+      if (fields["Step 4 Questions"]) {
+        questions.push({
+          id: `${submissionId}-step4`,
+          submissionId,
+          vendor: vendor || { name: "Unknown Vendor", email: "" },
+          companyName: fields["Company Name"],
+          submittedAt: fields["Submission Date"],
+          step: "Implementation & Pricing",
+          question: fields["Step 4 Questions"],
+          answer: fields["Step 4 Answers"] || null,
+          askedAt: fields["Submission Date"],
+          answeredAt: fields["Step 4 Answers"]
+            ? fields["Questions Last Updated"]
+            : null,
+          status: fields["Review Status"] || "Pending",
+          hasNewAnswer:
+            fields["Step 4 Answers"] && !fields["Vendor Viewed Answers"],
+        });
+      }
+    });
+
+    // Sort by unanswered first, then date
+    questions.sort((a, b) => {
+      if (!a.answer && b.answer) return -1;
+      if (a.answer && !b.answer) return 1;
+      return new Date(b.askedAt) - new Date(a.askedAt);
+    });
+
+    const unansweredCount = questions.filter((q) => !q.answer).length;
+
+    res.json({
+      success: true,
+      questions,
+      unansweredCount,
+    });
+  } catch (error) {
+    console.error("Admin get questions error:", error);
+    res.status(500).json({ error: "Failed to load questions" });
+  }
+});
+
+// ---------- Admin: Get All Questions ----------
+app.get("/api/admin/questions", async (req, res) => {
+  try {
+    const submissions = await base("Submissions")
+      .select({
+        fields: [
+          "id",
+          "Company Name",
+          "Vendor",
+          "Submission Date",
+          "Step 2 Questions",
+          "Step 3 Questions",
+          "Step 4 Questions",
+          "Step 2 Answers",
+          "Step 3 Answers",
+          "Step 4 Answers",
+          "Questions Last Updated",
+          "Review Status",
+          "Vendor Viewed Answers",
+        ],
+      })
+      .all();
+
+    const questions = [];
+    const vendorIds = submissions
+      .map((s) => s.fields.Vendor?.[0])
+      .filter(Boolean);
+
+    let vendorMap = {};
+    if (vendorIds.length > 0) {
+      const vendors = await base("Vendors")
+        .select({
+          filterByFormula: `OR(${vendorIds
+            .map((id) => `RECORD_ID() = '${id}'`)
+            .join(",")})`,
+          fields: ["Vendor Name", "Email"],
+        })
+        .all();
+
+      vendorMap = Object.fromEntries(
+        vendors.map((v) => [
+          v.id,
+          { name: v.fields["Vendor Name"], email: v.fields["Email"] },
+        ])
+      );
+    }
+
+    submissions.forEach((submission) => {
+      const fields = submission.fields;
+      const submissionId = submission.id;
+      const vendorId = fields.Vendor?.[0];
+      const vendor = vendorMap[vendorId];
+
+      // Step 2
+      if (fields["Step 2 Questions"]) {
+        questions.push({
+          id: `${submissionId}-step2`,
+          submissionId,
+          vendor: vendor || { name: "Unknown Vendor", email: "" },
+          companyName: fields["Company Name"],
+          submittedAt: fields["Submission Date"],
+          step: "Solution Fit & Use Cases",
+          question: fields["Step 2 Questions"],
+          answer: fields["Step 2 Answers"] || null,
+          askedAt: fields["Submission Date"],
+          answeredAt: fields["Step 2 Answers"]
+            ? fields["Questions Last Updated"]
+            : null,
+          status: fields["Review Status"] || "Pending",
+          hasNewAnswer:
+            fields["Step 2 Answers"] && !fields["Vendor Viewed Answers"],
+        });
+      }
+
+      // Step 3
+      if (fields["Step 3 Questions"]) {
+        questions.push({
+          id: `${submissionId}-step3`,
+          submissionId,
+          vendor: vendor || { name: "Unknown Vendor", email: "" },
+          companyName: fields["Company Name"],
+          submittedAt: fields["Submission Date"],
+          step: "Technical Capabilities & Compliance",
+          question: fields["Step 3 Questions"],
+          answer: fields["Step 3 Answers"] || null,
+          askedAt: fields["Submission Date"],
+          answeredAt: fields["Step 3 Answers"]
+            ? fields["Questions Last Updated"]
+            : null,
+          status: fields["Review Status"] || "Pending",
+          hasNewAnswer:
+            fields["Step 3 Answers"] && !fields["Vendor Viewed Answers"],
+        });
+      }
+
+      // Step 4
+      if (fields["Step 4 Questions"]) {
+        questions.push({
+          id: `${submissionId}-step4`,
+          submissionId,
+          vendor: vendor || { name: "Unknown Vendor", email: "" },
+          companyName: fields["Company Name"],
+          submittedAt: fields["Submission Date"],
+          step: "Implementation & Pricing",
+          question: fields["Step 4 Questions"],
+          answer: fields["Step 4 Answers"] || null,
+          askedAt: fields["Submission Date"],
+          answeredAt: fields["Step 4 Answers"]
+            ? fields["Questions Last Updated"]
+            : null,
+          status: fields["Review Status"] || "Pending",
+          hasNewAnswer:
+            fields["Step 4 Answers"] && !fields["Vendor Viewed Answers"],
+        });
+      }
+    });
+
+    // Sort by unanswered first, then date
+    questions.sort((a, b) => {
+      if (!a.answer && b.answer) return -1;
+      if (a.answer && !b.answer) return 1;
+      return new Date(b.askedAt) - new Date(a.askedAt);
+    });
+
+    const unansweredCount = questions.filter((q) => !q.answer).length;
+
+    res.json({
+      success: true,
+      questions,
+      unansweredCount,
+    });
+  } catch (error) {
+    console.error("Admin get questions error:", error);
+    res.status(500).json({ error: "Failed to load questions" });
+  }
+});
+
+// ---------- Admin: Answer Question ----------
+app.post("/api/admin/answer-question", async (req, res) => {
+  try {
+    const { submissionId, step, answer } = req.body;
+
+    if (!submissionId || !step || !answer) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const updateData = {
+      "Questions Last Updated": new Date().toISOString(),
+      "Vendor Viewed Answers": false, // Reset viewed flag when new answer is added
+    };
+
+    // Determine which step field to update
+    switch (step) {
+      case "Solution Fit & Use Cases":
+        updateData["Step 2 Answers"] = answer;
+        break;
+      case "Technical Capabilities & Compliance":
+        updateData["Step 3 Answers"] = answer;
+        break;
+      case "Implementation & Pricing":
+        updateData["Step 4 Answers"] = answer;
+        break;
+      default:
+        return res.status(400).json({ error: "Invalid step" });
+    }
+
+    await base("Submissions").update(submissionId, updateData);
+
+    res.json({
+      success: true,
+      message: "Answer submitted successfully",
+    });
+  } catch (error) {
+    console.error("Answer question error:", error);
+    res.status(500).json({ error: "Failed to submit answer" });
+  }
+});
+
+// ---------- Vendor: Mark Questions as Read ----------
+app.post("/api/vendor/mark-questions-read", verifyVendor, async (req, res) => {
+  try {
+    const vendorId = req.vendor.id;
+
+    // Get all submissions for this vendor - USING Vendor ID field
+    const allRecords = await base("Submissions")
+      .select({
+        fields: ["Vendor ID", "id"],
+      })
+      .all();
+
+    // CORRECTED: Proper vendor filtering
+    const vendorSubmissions = allRecords.filter((record) => {
+      const vendorField = record.fields["Vendor ID"];
+      if (Array.isArray(vendorField) && vendorField.length > 0) {
+        const linkedVendorId =
+          typeof vendorField[0] === "string"
+            ? vendorField[0]
+            : vendorField[0]?.id;
+        return linkedVendorId === vendorId;
+      }
+      return false;
+    });
+
+    console.log(`📝 Marking ${vendorSubmissions.length} submissions as read`);
+
+    // Update each submission to mark answers as viewed
+    const updatePromises = vendorSubmissions.map((submission) =>
+      base("Submissions").update(submission.id, {
+        "Vendor Viewed Answers": true,
+      })
+    );
+
+    await Promise.all(updatePromises);
+
+    res.json({
+      success: true,
+      message: "Questions marked as read",
+    });
+  } catch (error) {
+    console.error("Mark questions read error:", error);
+    res.status(500).json({ error: "Failed to update read status" });
   }
 });
 
@@ -992,7 +1858,7 @@ app.get("/api/admin/submissions", async (req, res) => {
     const records = await base("Submissions")
       .select({
         fields: [
-          "Vendor",
+          "Vendor ID",
           "Company Name",
           "Contact Person",
           "Email",
@@ -1012,7 +1878,7 @@ app.get("/api/admin/submissions", async (req, res) => {
     // Extract Vendor IDs
     const vendorIds = records
       .map((record) => {
-        const vendorField = record.fields["Vendor"];
+        const vendorField = record.fields["Vendor ID"];
         if (Array.isArray(vendorField) && vendorField.length > 0) {
           if (typeof vendorField[0] === "string") {
             return vendorField[0];
@@ -1048,7 +1914,7 @@ app.get("/api/admin/submissions", async (req, res) => {
       const fields = record.fields;
 
       let vendorId = null;
-      const vendorField = fields["Vendor"];
+      const vendorField = fields["Vendor ID"];
       if (Array.isArray(vendorField) && vendorField.length > 0) {
         if (typeof vendorField[0] === "string") {
           vendorId = vendorField[0];

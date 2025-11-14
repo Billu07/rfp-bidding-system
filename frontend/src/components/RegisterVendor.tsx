@@ -5,7 +5,7 @@ import { API_BASE } from "../config/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import axios from "axios";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   FileText,
   Download,
@@ -21,6 +21,7 @@ import {
   EyeOff,
   X,
   Loader2,
+  LogIn,
 } from "lucide-react";
 
 // === Zod Schema ===
@@ -63,10 +64,12 @@ export default function RegisterVendor() {
   const [submitMessage, setSubmitMessage] = useState<{
     type: "success" | "error";
     text: string;
+    action?: "login" | "contact";
   } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const {
     register,
@@ -185,13 +188,48 @@ export default function RegisterVendor() {
         });
       }
     } catch (err: any) {
-      setSubmitMessage({
-        type: "error",
-        text:
-          err.response?.data?.error || "Submission failed. Please try again.",
-      });
+      // Enhanced error handling for duplicate emails
+      if (err.response?.status === 409) {
+        const errorData = err.response.data;
+
+        if (errorData.existingStatus === "approved") {
+          setSubmitMessage({
+            type: "error",
+            text: "An account with this email already exists and is approved.",
+            action: "login",
+          });
+        } else if (errorData.existingStatus === "pending") {
+          setSubmitMessage({
+            type: "error",
+            text: "An account with this email is already pending approval.",
+            action: "contact",
+          });
+        } else {
+          setSubmitMessage({
+            type: "error",
+            text: "An account with this email already exists.",
+            action: "contact",
+          });
+        }
+      } else {
+        setSubmitMessage({
+          type: "error",
+          text:
+            err.response?.data?.error || "Submission failed. Please try again.",
+        });
+      }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // === Handle Action from Error Message ===
+  const handleAction = (action: "login" | "contact") => {
+    if (action === "login") {
+      navigate("/login");
+    } else {
+      // For contact support, you could open a mailto link or show contact info
+      window.location.href = "mailto:support@example.com";
     }
   };
 
@@ -692,12 +730,34 @@ export default function RegisterVendor() {
           </form>
         </div>
 
-        {/* Error Message Display */}
+        {/* Enhanced Error Message Display */}
         {submitMessage && submitMessage.type === "error" && (
           <div className="mt-8 p-6 rounded-2xl border-2 text-center font-semibold animate-fadeIn bg-red-50 text-red-800 border-red-200">
-            <div className="flex items-center justify-center gap-3">
-              <AlertCircle className="w-6 h-6 text-red-600" />
-              <p className="text-lg">{submitMessage.text}</p>
+            <div className="flex flex-col items-center justify-center gap-3">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-6 h-6 text-red-600" />
+                <p className="text-lg">{submitMessage.text}</p>
+              </div>
+              {submitMessage.action && (
+                <div className="mt-3 flex gap-3">
+                  {submitMessage.action === "login" ? (
+                    <button
+                      onClick={() => handleAction("login")}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      Go to Login
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleAction("contact")}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      Contact Support
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

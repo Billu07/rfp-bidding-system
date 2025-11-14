@@ -1,8 +1,7 @@
-// frontend/src/components/Login.tsx - UPDATED FOR BRAND ANONYMITY
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { API_BASE } from "../config/api";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Mail,
   Lock,
@@ -30,7 +29,6 @@ export default function Login() {
   const [isLocked, setIsLocked] = useState(false);
   const [lockTime, setLockTime] = useState(0);
   const [activeTab, setActiveTab] = useState<"vendor" | "admin">("vendor");
-  const navigate = useNavigate();
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus email on load
@@ -103,7 +101,8 @@ export default function Login() {
 
           localStorage.setItem("vendor", JSON.stringify(vendorData));
           localStorage.setItem("vendor_session", "active");
-          navigate("/dashboard", { replace: true });
+          // REDIRECT TO LANDING PAGE INSTEAD OF DASHBOARD
+          window.location.href = "/";
         } else {
           throw new Error(res.data.error || "Login failed");
         }
@@ -122,7 +121,8 @@ export default function Login() {
 
         if (res.data.success) {
           localStorage.setItem("admin", JSON.stringify(res.data.admin));
-          navigate("/admin/dashboard", { replace: true });
+          // REDIRECT TO LANDING PAGE INSTEAD OF ADMIN DASHBOARD
+          window.location.href = "/";
         } else {
           throw new Error(res.data.error || "Admin login failed");
         }

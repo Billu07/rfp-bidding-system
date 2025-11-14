@@ -169,33 +169,70 @@ export default function MultiStepSubmission() {
   // Load draft or existing submission on component mount
   useEffect(() => {
     const loadData = async () => {
+      console.log("🎯 Component mounted, submissionId:", submissionId);
+
       if (submissionId) {
-        // Editing existing submission
+        // Editing existing submission - LOAD FROM SUBMISSIONS TABLE
+        console.log("📥 Loading EXISTING submission for editing");
         await loadExistingSubmission();
       } else {
-        // Check for draft
+        // Creating new submission - check for draft
+        console.log("📥 Creating NEW submission, checking for draft");
         await loadDraft();
       }
     };
 
     loadData();
-  }, [submissionId]);
+  }, [submissionId]); // Only depend on submissionId
 
+  // In MultiStepSubmission.tsx - FIX the loadExistingSubmission function
   const loadExistingSubmission = async () => {
     setIsEditing(true);
     try {
+      const vendorData = localStorage.getItem("vendor");
+      if (!vendorData) {
+        console.error("No vendor data found");
+        return;
+      }
+
+      const vendor = JSON.parse(vendorData);
+
+      console.log("🔍 Loading EXISTING SUBMISSION for editing:", submissionId);
+
+      // Use the correct endpoint for loading submissions
       const response = await fetch(`/api/vendor/submissions/${submissionId}`, {
         headers: {
           "X-Vendor-Data": JSON.stringify(vendor),
         },
       });
 
+      console.log("📡 Submission load response status:", response.status);
+
       if (response.ok) {
-        const existingData = await response.json();
-        setFormData(existingData);
+        const result = await response.json();
+        console.log("✅ Submission API response:", result);
+
+        if (result.success && result.submission) {
+          console.log(
+            "🚀 Setting form data with submission:",
+            result.submission
+          );
+          setFormData(result.submission);
+          setHasUnsavedChanges(false);
+        } else {
+          console.error("❌ API returned error:", result.error);
+          alert(
+            "Failed to load submission: " + (result.error || "Unknown error")
+          );
+        }
+      } else {
+        const errorData = await response.json();
+        console.error("❌ HTTP error loading submission:", errorData);
+        alert("Access denied or submission not found");
       }
     } catch (error) {
-      console.error("Failed to load submission:", error);
+      console.error("💥 Error loading submission:", error);
+      alert("Error loading submission data");
     }
   };
 

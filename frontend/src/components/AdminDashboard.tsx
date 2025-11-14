@@ -1,6 +1,7 @@
 // frontend/src/components/AdminDashboard.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
+import AdminQuestionsPanel from "./AdminQuestionsPanel";
 import { API_BASE } from "../config/api";
 import { useNavigate } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
@@ -8,7 +9,6 @@ import {
   Shield,
   Users,
   FileText,
-  Star,
   Search,
   CheckCircle,
   XCircle,
@@ -26,13 +26,12 @@ import {
   TrendingUp,
   BarChart3,
   X,
-  Plus,
-  Target,
-  ClipboardList,
-  UserCheck,
-  FilePlus,
   Eye,
   RefreshCw,
+  UserCheck,
+  ClipboardList,
+  Target,
+  MessageSquare,
 } from "lucide-react";
 
 interface Vendor {
@@ -45,13 +44,11 @@ interface Vendor {
   Website?: string;
   Country?: string;
   "Company Size"?: string;
-  "NDA Document"?: { url: string }[];
-  "NDA Upload Date"?: string;
-  Status?: string;
-  // Add these new Cloudinary fields:
   "NDA Cloudinary URL"?: string;
   "NDA Cloudinary Public ID"?: string;
   "NDA View URL"?: string;
+  Status?: string;
+  "Last Login"?: string;
 }
 
 interface Submission {
@@ -59,30 +56,24 @@ interface Submission {
   rfpName: string;
   vendorName: string;
   vendorId: string;
-  basePrice?: number;
-  currency?: string;
-  timeline?: number;
-  proposalUrl?: string;
-  rating?: string;
+  companyName: string;
+  contactPerson: string;
+  email: string;
   status: string;
   submittedAt: string;
   adminNotes?: string;
-}
-
-interface RFP {
-  id: string;
-  "RFP ID"?: number;
-  "RFP Name": string;
-  Objective: string;
-  Scope?: string;
-  Timeline?: string;
-  "Budget Guidance"?: string;
-  "Submission Deadline": string;
-  Status: string;
-  Owner?: string;
-  "Owner Email"?: string;
-  "Created Date": string;
-  "Last Modified"?: string;
+  implementationTimeline?: string;
+  upfrontCost?: number;
+  monthlyCost?: number;
+  // Step 3 integration capabilities
+  integrationScores?: {
+    zendesk: string;
+    oracleSql: string;
+    quickbooks: string;
+    slack: string;
+    brex: string;
+    avinode: string;
+  };
 }
 
 // Safe formatting functions
@@ -108,36 +99,39 @@ const safeFormatDate = (dateString: string | undefined): string => {
   }
 };
 
-const safeFormatPrice = (
-  price: number | undefined,
-  currency: string = "USD"
-): string => {
-  return price === undefined || price === null
+const safeFormatPrice = (price: number | undefined): string => {
+  return price === undefined || price === null || price === 0
     ? "Not specified"
     : new Intl.NumberFormat("en-US", {
         style: "currency",
-        currency: currency,
+        currency: "USD",
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       }).format(price);
 };
 
-const safeFormatTimeline = (timeline: number | undefined): string => {
-  return timeline === undefined || timeline === null
-    ? "Not specified"
-    : `${timeline} days`;
+const getIntegrationStatusIcon = (status: string) => {
+  switch (status) {
+    case "✅ Can integrate and have done previously":
+      return "✅";
+    case "⚙️ Can integrate but have not done previously":
+      return "⚙️";
+    case "❌ Cannot integrate":
+      return "❌";
+    default:
+      return "❓";
+  }
 };
 
 export default function AdminDashboard() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [rfps, setRfps] = useState<RFP[]>([]);
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "vendors" | "submissions" | "rfps"
+    "dashboard" | "vendors" | "submissions" | "questions"
   >("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [sortBy, setSortBy] = useState<"date" | "price" | "rating">("date");
+  const [sortBy, setSortBy] = useState<"date" | "cost">("date");
   const [showNdaPreview, setShowNdaPreview] = useState<string | null>(null);
   const [showSubmissionModal, setShowSubmissionModal] = useState<{
     show: boolean;
@@ -148,26 +142,13 @@ export default function AdminDashboard() {
     submission: null,
     action: "",
   });
-  const [showRfpModal, setShowRfpModal] = useState(false);
+  const [showSubmissionDetail, setShowSubmissionDetail] =
+    useState<Submission | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
-
-  // New RFP Form State
-  const [rfpForm, setRfpForm] = useState({
-    rfpName: "",
-    objective: "",
-    description: "",
-    submissionDeadline: "",
-    category: "General",
-    budget: "",
-    requirements: "",
-    evaluationCriteria: "",
-    contactPerson: "",
-    contactEmail: "",
-  });
 
   useEffect(() => {
     if (!localStorage.getItem("admin")) {
@@ -188,7 +169,6 @@ export default function AdminDashboard() {
     try {
       let vendorsData: Vendor[] = [];
       let submissionsData: Submission[] = [];
-      let rfpsData: RFP[] = [];
 
       try {
         const vRes = await axios.get(`${API_BASE}/api/admin/pending-vendors`);
@@ -210,19 +190,8 @@ export default function AdminDashboard() {
         );
       }
 
-      try {
-        const rRes = await axios.get(`${API_BASE}/api/admin/rfps`);
-        rfpsData = rRes.data.rfps;
-      } catch (err: any) {
-        console.error(
-          "Failed to fetch RFPs:",
-          err.response?.data || err.message
-        );
-      }
-
       setVendors(vendorsData);
       setSubmissions(submissionsData);
-      setRfps(rfpsData);
     } catch (err: any) {
       setError(
         `Failed to load admin data: ${err.response?.data?.error || err.message}`
@@ -271,62 +240,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleRating = async (id: string, rating: string) => {
-    try {
-      await axios.post(`${API_BASE}/api/admin/rate-submission`, {
-        submissionId: id,
-        rating,
-      });
-      fetchData();
-    } catch (err) {
-      alert("Rating failed.");
-    }
-  };
-
-  const handleCreateRfp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await axios.post(`${API_BASE}/api/admin/create-rfp`, rfpForm);
-      setShowRfpModal(false);
-      setRfpForm({
-        rfpName: "",
-        objective: "",
-        description: "",
-        submissionDeadline: "",
-        category: "General",
-        budget: "",
-        requirements: "",
-        evaluationCriteria: "",
-        contactPerson: "",
-        contactEmail: "",
-      });
-      fetchData();
-    } catch (err: any) {
-      alert(
-        `Failed to create RFP: ${err.response?.data?.error || err.message}`
-      );
-    }
-  };
-
-  const handleRfpStatusChange = async (rfpId: string, status: string) => {
-    try {
-      await axios.post(`${API_BASE}/api/admin/update-rfp-status`, {
-        rfpId,
-        status,
-      });
-      fetchData();
-    } catch (err: any) {
-      alert(
-        `Failed to update RFP status: ${
-          err.response?.data?.error || err.message
-        }`
-      );
-    }
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("admin");
-    navigate("/admin/login");
+    window.location.href = "/";
   };
 
   // Stats Calculation
@@ -342,10 +258,8 @@ export default function AdminDashboard() {
       pendingReviewSubmissions: submissions.filter(
         (s) => s.status === "Pending" || s.status === "Under Review"
       ).length,
-      activeRfps: rfps.filter((r) => r.Status === "Active").length,
-      totalRfps: rfps.length,
     }),
-    [vendors, submissions, rfps]
+    [vendors, submissions]
   );
 
   // Filter & Sort Logic
@@ -362,8 +276,9 @@ export default function AdminDashboard() {
     if (searchQuery) {
       filtered = filtered.filter(
         (s) =>
-          s.rfpName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.vendorName.toLowerCase().includes(searchQuery.toLowerCase())
+          s.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.vendorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.contactPerson.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     if (filterStatus !== "all") {
@@ -376,33 +291,13 @@ export default function AdminDashboard() {
             new Date(b.submittedAt).getTime() -
             new Date(a.submittedAt).getTime()
           );
-        case "price":
-          return (b.basePrice || 0) - (a.basePrice || 0);
-        case "rating":
-          const ratingOrder: { [key: string]: number } = {
-            "5-Star": 5,
-            "4-Star": 4,
-            "3-Star": 3,
-            "2-Star": 2,
-            "1-Star": 1,
-          };
-          return (
-            (ratingOrder[b.rating || ""] || 0) -
-            (ratingOrder[a.rating || ""] || 0)
-          );
+        case "cost":
+          return (b.upfrontCost || 0) - (a.upfrontCost || 0);
         default:
           return 0;
       }
     });
   }, [submissions, searchQuery, filterStatus, sortBy]);
-
-  const filteredRfps = useMemo(() => {
-    return rfps.filter(
-      (rfp) =>
-        rfp["RFP Name"].toLowerCase().includes(searchQuery.toLowerCase()) ||
-        rfp.Objective.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [rfps, searchQuery]);
 
   const getStatusBadge = (status: string) => {
     const base =
@@ -418,35 +313,9 @@ export default function AdminDashboard() {
         return `${base} bg-green-100 text-green-800 border border-green-200`;
       case "Rejected":
         return `${base} bg-red-100 text-red-800 border border-red-200`;
-      case "Active":
-        return `${base} bg-emerald-100 text-emerald-800 border border-emerald-200`;
-      case "Closed":
-        return `${base} bg-gray-100 text-gray-800 border border-gray-200`;
-      case "Draft":
-        return `${base} bg-orange-100 text-orange-800 border border-orange-200`;
-      case "Archived":
-        return `${base} bg-gray-100 text-gray-800 border border-gray-200`;
       default:
         return `${base} bg-gray-100 text-gray-800 border border-gray-200`;
     }
-  };
-
-  const getRatingStars = (rating?: string) => {
-    if (!rating) return null;
-    const stars = rating.split("-")[0];
-    return (
-      <div className="flex items-center gap-1">
-        {Array.from({ length: 5 }, (_, i) => (
-          <Star
-            key={i}
-            className={`w-3.5 h-3.5 ${
-              i < +stars ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-            }`}
-          />
-        ))}
-        <span className="ml-1 text-xs font-medium text-gray-700">{rating}</span>
-      </div>
-    );
   };
 
   if (isLoading) {
@@ -509,15 +378,22 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Admin Portal
+                  Aviation RFP Portal
                 </h1>
                 <p className="text-xs text-gray-500 font-medium">
-                  Vendor & RFP Management
+                  Private Aviation Workflow Modernization
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-4">
+              <a
+                href="/"
+                className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-blue-600 px-3 py-2 rounded-lg hover:bg-gray-100 transition"
+              >
+                <Eye className="w-4 h-4" />
+                View RFP
+              </a>
               <button
                 onClick={() => fetchData(true)}
                 disabled={isRefreshing}
@@ -543,7 +419,7 @@ export default function AdminDashboard() {
       {/* Stats Bar */}
       <div className="bg-white/60 backdrop-blur-sm border-b border-gray-200/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-gray-200/50 hover:shadow-md transition">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -605,38 +481,6 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
-
-            <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-gray-200/50 hover:shadow-md transition">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Target className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Active RFPs
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {stats.activeRfps}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-gray-200/50 hover:shadow-md transition">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <BarChart3 className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Total RFPs
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {stats.totalRfps}
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -651,7 +495,7 @@ export default function AdminDashboard() {
               { id: "dashboard", label: "Dashboard", icon: BarChart3 },
               { id: "vendors", label: "Vendors", icon: Users },
               { id: "submissions", label: "Submissions", icon: FileText },
-              { id: "rfps", label: "RFPs", icon: Target },
+              { id: "questions", label: "Q&A", icon: MessageSquare },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -683,9 +527,7 @@ export default function AdminDashboard() {
                   activeTab === "vendors"
                     ? "Search vendors..."
                     : activeTab === "submissions"
-                    ? "Search RFPs or vendors..."
-                    : activeTab === "rfps"
-                    ? "Search RFPs..."
+                    ? "Search companies or contacts..."
                     : "Search..."
                 }
                 value={searchQuery}
@@ -714,20 +556,9 @@ export default function AdminDashboard() {
                   className="px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                 >
                   <option value="date">Latest First</option>
-                  <option value="price">Highest Price</option>
-                  <option value="rating">Best Rated</option>
+                  <option value="cost">Highest Cost</option>
                 </select>
               </div>
-            )}
-
-            {activeTab === "rfps" && (
-              <button
-                onClick={() => setShowRfpModal(true)}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transform hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-blue-200"
-              >
-                <Plus className="w-5 h-5" />
-                New RFP
-              </button>
             )}
           </div>
         </div>
@@ -740,24 +571,25 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-blue-600" />
-                  Recent Activity
+                  Recent Submissions
                 </h3>
                 <span className="text-sm text-gray-500">
-                  {submissions.length} total submissions
+                  {submissions.length} total
                 </span>
               </div>
               <div className="space-y-3">
                 {submissions.slice(0, 6).map((submission) => (
                   <div
                     key={submission.id}
-                    className="flex items-center justify-between p-4 bg-gray-50/50 rounded-xl border border-gray-200/50 hover:bg-white transition"
+                    className="flex items-center justify-between p-4 bg-gray-50/50 rounded-xl border border-gray-200/50 hover:bg-white transition cursor-pointer"
+                    onClick={() => setShowSubmissionDetail(submission)}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 truncate">
-                        {submission.vendorName}
+                        {submission.companyName}
                       </p>
                       <p className="text-sm text-gray-600 truncate">
-                        Submitted for {submission.rfpName}
+                        {submission.contactPerson}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
                         {safeFormatDistance(submission.submittedAt)}
@@ -771,7 +603,7 @@ export default function AdminDashboard() {
                 {submissions.length === 0 && (
                   <div className="text-center py-8">
                     <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500">No recent activity</p>
+                    <p className="text-gray-500">No submissions yet</p>
                   </div>
                 )}
               </div>
@@ -811,23 +643,35 @@ export default function AdminDashboard() {
                 </button>
 
                 <button
-                  onClick={() => setActiveTab("rfps")}
-                  className="p-5 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl hover:shadow-md transition text-left border border-orange-200/50 group"
+                  onClick={() => {
+                    setActiveTab("submissions");
+                    setFilterStatus("Shortlisted");
+                  }}
+                  className="p-5 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl hover:shadow-md transition text-left border border-purple-200/50 group"
                 >
-                  <Target className="w-8 h-8 text-orange-600 mb-3 group-hover:scale-110 transition" />
-                  <p className="font-semibold text-gray-900">Manage RFPs</p>
+                  <UserCheck className="w-8 h-8 text-purple-600 mb-3 group-hover:scale-110 transition" />
+                  <p className="font-semibold text-gray-900">
+                    Shortlisted Proposals
+                  </p>
                   <p className="text-sm text-gray-600 mt-1">
-                    {rfps.length} total RFPs
+                    {stats.shortlistedSubmissions} candidates
                   </p>
                 </button>
 
                 <button
-                  onClick={() => setShowRfpModal(true)}
-                  className="p-5 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl hover:shadow-md transition text-left border border-purple-200/50 group"
+                  onClick={() => {
+                    setActiveTab("submissions");
+                    setFilterStatus("Approved");
+                  }}
+                  className="p-5 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl hover:shadow-md transition text-left border border-emerald-200/50 group"
                 >
-                  <FilePlus className="w-8 h-8 text-purple-600 mb-3 group-hover:scale-110 transition" />
-                  <p className="font-semibold text-gray-900">Create RFP</p>
-                  <p className="text-sm text-gray-600 mt-1">New opportunity</p>
+                  <Target className="w-8 h-8 text-emerald-600 mb-3 group-hover:scale-110 transition" />
+                  <p className="font-semibold text-gray-900">
+                    Approved Solutions
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {stats.approvedSubmissions} ready
+                  </p>
                 </button>
               </div>
             </div>
@@ -909,11 +753,13 @@ export default function AdminDashboard() {
                                   </a>
                                 </p>
                               )}
-                              {v["NDA Upload Date"] && (
+                              {v["Last Login"] && (
                                 <p className="flex items-center gap-2">
                                   <Calendar className="w-4 h-4" />
-                                  <span className="font-medium">Applied:</span>
-                                  {safeFormatDistance(v["NDA Upload Date"])}
+                                  <span className="font-medium">
+                                    Last Login:
+                                  </span>
+                                  {safeFormatDistance(v["Last Login"])}
                                 </p>
                               )}
                             </div>
@@ -936,7 +782,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3">
-                      {/* NDA Preview Button - Using simple Cloudinary URL */}
+                      {/* NDA Preview Button */}
                       {(v["NDA Cloudinary URL"] || v["NDA View URL"]) && (
                         <button
                           onClick={() =>
@@ -983,22 +829,19 @@ export default function AdminDashboard() {
                 <thead className="bg-gray-50/80 border-b border-gray-200/50">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      RFP & Vendor
+                      Company & Contact
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Submitted
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Price
+                      Costs
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Timeline
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Rating
                     </th>
                     <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Actions
@@ -1008,7 +851,7 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-gray-200/50">
                   {filteredSubmissions.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-16 text-center">
+                      <td colSpan={6} className="px-6 py-16 text-center">
                         <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                         <p className="text-gray-500 font-medium">
                           No submissions match your filters
@@ -1020,14 +863,21 @@ export default function AdminDashboard() {
                     </tr>
                   ) : (
                     filteredSubmissions.map((s) => (
-                      <tr key={s.id} className="hover:bg-gray-50/50 transition">
+                      <tr
+                        key={s.id}
+                        className="hover:bg-gray-50/50 transition cursor-pointer"
+                        onClick={() => setShowSubmissionDetail(s)}
+                      >
                         <td className="px-6 py-5">
                           <div>
                             <p className="text-sm font-semibold text-gray-900">
-                              {s.rfpName}
+                              {s.companyName}
                             </p>
                             <p className="text-sm text-gray-600 mt-1">
-                              {s.vendorName}
+                              {s.contactPerson}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {s.email}
                             </p>
                           </div>
                         </td>
@@ -1043,15 +893,21 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                         <td className="px-6 py-5">
-                          <div className="flex items-center gap-1 text-sm font-semibold text-gray-900">
-                            <DollarSign className="w-4 h-4 text-green-600" />
-                            {safeFormatPrice(s.basePrice, s.currency)}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1 text-sm font-semibold text-gray-900">
+                              <DollarSign className="w-4 h-4 text-green-600" />
+                              Upfront: {safeFormatPrice(s.upfrontCost)}
+                            </div>
+                            <div className="flex items-center gap-1 text-sm text-gray-700">
+                              <DollarSign className="w-4 h-4 text-blue-600" />
+                              Monthly: {safeFormatPrice(s.monthlyCost)}
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-1 text-sm text-gray-700">
                             <Clock className="w-4 h-4 text-blue-600" />
-                            {safeFormatTimeline(s.timeline)}
+                            {s.implementationTimeline || "Not specified"}
                           </div>
                         </td>
                         <td className="px-6 py-5">
@@ -1060,56 +916,17 @@ export default function AdminDashboard() {
                           </span>
                         </td>
                         <td className="px-6 py-5">
-                          {s.rating ? (
-                            getRatingStars(s.rating)
-                          ) : (
-                            <div className="flex gap-1">
-                              {[
-                                "1-Star",
-                                "2-Star",
-                                "3-Star",
-                                "4-Star",
-                                "5-Star",
-                              ].map((r) => (
-                                <button
-                                  key={r}
-                                  onClick={() => handleRating(s.id, r)}
-                                  className={`px-2 py-1 text-xs rounded-lg font-medium transition ${
-                                    s.rating === r
-                                      ? "bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-sm"
-                                      : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                                  }`}
-                                >
-                                  {r[0]}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-5">
                           <div className="flex justify-end gap-2">
-                            {s.proposalUrl && (
-                              <a
-                                href={s.proposalUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium text-sm px-3 py-2 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition"
-                              >
-                                <Download className="w-4 h-4" />
-                                <span className="hidden sm:inline">
-                                  Download
-                                </span>
-                              </a>
-                            )}
                             <div className="flex gap-1">
                               <button
-                                onClick={() =>
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setShowSubmissionModal({
                                     show: true,
                                     submission: s,
                                     action: "approve",
-                                  })
-                                }
+                                  });
+                                }}
                                 className="px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs font-semibold rounded-lg hover:shadow-lg transition flex items-center gap-1"
                               >
                                 <CheckCircle className="w-3 h-3" />
@@ -1118,13 +935,14 @@ export default function AdminDashboard() {
                                 </span>
                               </button>
                               <button
-                                onClick={() =>
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setShowSubmissionModal({
                                     show: true,
                                     submission: s,
                                     action: "shortlist",
-                                  })
-                                }
+                                  });
+                                }}
                                 className="px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-semibold rounded-lg hover:shadow-lg transition flex items-center gap-1"
                               >
                                 <ClipboardList className="w-3 h-3" />
@@ -1133,13 +951,14 @@ export default function AdminDashboard() {
                                 </span>
                               </button>
                               <button
-                                onClick={() =>
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setShowSubmissionModal({
                                     show: true,
                                     submission: s,
                                     action: "decline",
-                                  })
-                                }
+                                  });
+                                }}
                                 className="px-3 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-semibold rounded-lg hover:shadow-lg transition flex items-center gap-1"
                               >
                                 <XCircle className="w-3 h-3" />
@@ -1159,99 +978,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* RFPs Tab */}
-        {activeTab === "rfps" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredRfps.map((rfp) => (
-                <div
-                  key={rfp.id}
-                  className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6 hover:shadow-lg transition group"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-bold text-gray-900 truncate">
-                        {rfp["RFP Name"]}
-                      </h3>
-                      {rfp["RFP ID"] && (
-                        <p className="text-sm text-gray-500 mt-1">
-                          ID: {rfp["RFP ID"]}
-                        </p>
-                      )}
-                    </div>
-                    <span className={getStatusBadge(rfp.Status)}>
-                      {rfp.Status}
-                    </span>
-                  </div>
-
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {rfp.Objective}
-                  </p>
-
-                  <div className="space-y-3 text-sm text-gray-600 mb-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-blue-600" />
-                      <span className="font-medium">Deadline:</span>
-                      <span>{safeFormatDate(rfp["Submission Deadline"])}</span>
-                    </div>
-                    {rfp["Budget Guidance"] && (
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-green-600" />
-                        <span className="font-medium">Budget:</span>
-                        <span>{rfp["Budget Guidance"]}</span>
-                      </div>
-                    )}
-                    {rfp.Owner && (
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-purple-600" />
-                        <span className="font-medium">Owner:</span>
-                        <span>{rfp.Owner}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex justify-between items-center pt-4 border-t border-gray-200/50">
-                    <div className="text-xs text-gray-500">
-                      Created {safeFormatDistance(rfp["Created Date"])}
-                    </div>
-                    <div className="flex gap-2">
-                      <select
-                        value={rfp.Status}
-                        onChange={(e) =>
-                          handleRfpStatusChange(rfp.id, e.target.value)
-                        }
-                        className="text-xs border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white/80 backdrop-blur-sm"
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Closed">Closed</option>
-                        <option value="Draft">Draft</option>
-                        <option value="Archived">Archived</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {filteredRfps.length === 0 && (
-              <div className="text-center py-16 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50">
-                <Target className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg font-medium mb-2">
-                  No RFPs found
-                </p>
-                <p className="text-gray-400 mb-6">
-                  Get started by creating your first RFP
-                </p>
-                <button
-                  onClick={() => setShowRfpModal(true)}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transform hover:scale-105 transition-all flex items-center gap-2 mx-auto shadow-lg shadow-blue-200"
-                >
-                  <Plus className="w-5 h-5" /> Create Your First RFP
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Questions Tab */}
+        {activeTab === "questions" && <AdminQuestionsPanel />}
       </div>
 
       {/* Enhanced NDA Preview Modal */}
@@ -1325,6 +1053,153 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Submission Detail Modal */}
+      {showSubmissionDetail && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 sticky top-0 bg-white">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Submission Details
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {showSubmissionDetail.companyName} -{" "}
+                  {showSubmissionDetail.contactPerson}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSubmissionDetail(null)}
+                className="text-gray-400 hover:text-gray-600 transition p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Basic Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    Company Information
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <strong>Company:</strong>{" "}
+                      {showSubmissionDetail.companyName}
+                    </p>
+                    <p>
+                      <strong>Contact:</strong>{" "}
+                      {showSubmissionDetail.contactPerson}
+                    </p>
+                    <p>
+                      <strong>Email:</strong> {showSubmissionDetail.email}
+                    </p>
+                    <p>
+                      <strong>Submitted:</strong>{" "}
+                      {safeFormatDate(showSubmissionDetail.submittedAt)}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    Pricing & Timeline
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <strong>Upfront Cost:</strong>{" "}
+                      {safeFormatPrice(showSubmissionDetail.upfrontCost)}
+                    </p>
+                    <p>
+                      <strong>Monthly Cost:</strong>{" "}
+                      {safeFormatPrice(showSubmissionDetail.monthlyCost)}
+                    </p>
+                    <p>
+                      <strong>Timeline:</strong>{" "}
+                      {showSubmissionDetail.implementationTimeline ||
+                        "Not specified"}
+                    </p>
+                    <p>
+                      <strong>Status:</strong>{" "}
+                      <span
+                        className={getStatusBadge(showSubmissionDetail.status)}
+                      >
+                        {showSubmissionDetail.status}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Integration Capabilities */}
+              {showSubmissionDetail.integrationScores && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    Integration Capabilities
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                    {Object.entries(showSubmissionDetail.integrationScores).map(
+                      ([key, value]) => (
+                        <div
+                          key={key}
+                          className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"
+                        >
+                          <span>{getIntegrationStatusIcon(value)}</span>
+                          <span className="capitalize">
+                            {key.replace(/([A-Z])/g, " $1").trim()}
+                          </span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Notes */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">
+                  Admin Notes
+                </h4>
+                <textarea
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  placeholder="Add notes or feedback for this submission..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => setShowSubmissionDetail(null)}
+                className="px-5 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-100 transition"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  handleSubmissionAction(showSubmissionDetail.id, "shortlist");
+                  setShowSubmissionDetail(null);
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-medium rounded-xl hover:shadow-lg transition"
+              >
+                Shortlist
+              </button>
+              <button
+                onClick={() => {
+                  handleSubmissionAction(showSubmissionDetail.id, "approve");
+                  setShowSubmissionDetail(null);
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white font-medium rounded-xl hover:shadow-lg transition"
+              >
+                Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Submission Action Modal */}
       {showSubmissionModal.show && showSubmissionModal.submission && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
@@ -1354,11 +1229,7 @@ export default function AdminDashboard() {
                 </strong>{" "}
                 the submission from{" "}
                 <strong className="text-gray-900">
-                  {showSubmissionModal.submission.vendorName}
-                </strong>{" "}
-                for{" "}
-                <strong className="text-gray-900">
-                  {showSubmissionModal.submission.rfpName}
+                  {showSubmissionModal.submission.companyName}
                 </strong>
                 .
               </p>
@@ -1400,154 +1271,6 @@ export default function AdminDashboard() {
                 Confirm {showSubmissionModal.action}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create RFP Modal */}
-      {showRfpModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200 sticky top-0 bg-white">
-              <h3 className="text-lg font-bold text-gray-900">
-                Create New RFP
-              </h3>
-              <button
-                onClick={() => setShowRfpModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <form onSubmit={handleCreateRfp} className="p-6">
-              <div className="grid grid-cols-1 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    RFP Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={rfpForm.rfpName}
-                    onChange={(e) =>
-                      setRfpForm({ ...rfpForm, rfpName: e.target.value })
-                    }
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                    placeholder="Enter RFP name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Objective *
-                  </label>
-                  <textarea
-                    required
-                    value={rfpForm.objective}
-                    onChange={(e) =>
-                      setRfpForm({ ...rfpForm, objective: e.target.value })
-                    }
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
-                    placeholder="Describe the RFP objective and goals"
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Scope & Description
-                  </label>
-                  <textarea
-                    value={rfpForm.description}
-                    onChange={(e) =>
-                      setRfpForm({ ...rfpForm, description: e.target.value })
-                    }
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
-                    placeholder="Detailed scope, requirements, and deliverables"
-                    rows={3}
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Submission Deadline *
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={rfpForm.submissionDeadline}
-                      onChange={(e) =>
-                        setRfpForm({
-                          ...rfpForm,
-                          submissionDeadline: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Budget Guidance
-                    </label>
-                    <input
-                      type="text"
-                      value={rfpForm.budget}
-                      onChange={(e) =>
-                        setRfpForm({ ...rfpForm, budget: e.target.value })
-                      }
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                      placeholder="e.g., $50,000 - $100,000"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      RFP Owner
-                    </label>
-                    <input
-                      type="text"
-                      value={rfpForm.contactPerson}
-                      onChange={(e) =>
-                        setRfpForm({
-                          ...rfpForm,
-                          contactPerson: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                      placeholder="RFP owner name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Owner Email
-                    </label>
-                    <input
-                      type="email"
-                      value={rfpForm.contactEmail}
-                      onChange={(e) =>
-                        setRfpForm({ ...rfpForm, contactEmail: e.target.value })
-                      }
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                      placeholder="owner@company.com"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowRfpModal(false)}
-                  className="px-5 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-xl hover:shadow-lg transition flex items-center gap-2"
-                >
-                  <FilePlus className="w-4 h-4" /> Create RFP
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

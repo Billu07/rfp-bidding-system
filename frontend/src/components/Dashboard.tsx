@@ -1,6 +1,7 @@
 // frontend/src/components/dashboard.tsx - SIMPLIFIED FOR SINGLE RFP
 import { useState, useEffect } from "react";
 import axios from "axios";
+import VendorQuestions from "./VendorQuestions";
 import {
   FileText,
   Target,
@@ -136,7 +137,7 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("vendor");
-    navigate("/login");
+    navigate("/"); // Navigate to landing page
   };
 
   if (loading) {
@@ -194,6 +195,13 @@ export default function Dashboard() {
                   <FileText className="w-4 h-4" />
                   My Submissions
                 </NavLink>
+                <a
+                  href="/"
+                  className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center gap-2 text-gray-600 hover:text-blue-600"
+                >
+                  <Eye className="w-4 h-4" />
+                  View RFP
+                </a>
               </nav>
             </div>
 
@@ -415,6 +423,11 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Q&A Section - ADD THIS RIGHT HERE */}
+        <div className="mb-8">
+          <VendorQuestions />
+        </div>
       </main>
     </div>
   );

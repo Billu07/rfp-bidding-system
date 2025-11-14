@@ -17,6 +17,7 @@ import {
   Target,
   Edit,
   Eye,
+  MessageSquare,
 } from "lucide-react";
 
 interface Submission {
@@ -466,6 +467,11 @@ export default function MySubmissions() {
                           )}`}
                         >
                           {s.status === "Under Review" ? "In Review" : s.status}
+                          {s.canEdit && (
+                            <span className="ml-1 text-xs opacity-75">
+                              • Editable
+                            </span>
+                          )}
                         </span>
                       </td>
                       <td className="px-6 py-5">
@@ -500,6 +506,13 @@ export default function MySubmissions() {
                               <Edit className="w-4 h-4" />
                             </button>
                           )}
+                          <button
+                            onClick={() => navigate("/dashboard")}
+                            className="p-2 text-gray-400 hover:text-purple-600 transition"
+                            title="View Questions & Answers"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
