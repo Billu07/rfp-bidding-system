@@ -666,11 +666,19 @@ export default function LandingPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                {/* Updated Download Button Section */}
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                   <button
                     onClick={() => {
+                      // Direct download approach
                       const ndaUrl = "/Atlas_NDA.pdf";
-                      window.open(ndaUrl, "_blank");
+                      const link = document.createElement("a");
+                      link.href = ndaUrl;
+                      link.download = "Atlas-Aviation-RFP-NDA-Agreement.pdf";
+                      link.target = "_blank";
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
                     }}
                     className="inline-flex items-center px-6 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 transition-all duration-300 shadow-lg hover:shadow-xl"
                   >
