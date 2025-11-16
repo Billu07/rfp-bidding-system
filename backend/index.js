@@ -7,6 +7,7 @@ const path = require("path");
 const Airtable = require("airtable");
 const bcrypt = require("bcrypt");
 const fs = require("fs");
+const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 
 const app = express();
@@ -842,22 +843,79 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
     const submissionId = req.params.id;
     const vendorId = req.vendor.id;
 
+    console.log(
+      "🔍 Getting submission:",
+      submissionId,
+      "for vendor:",
+      vendorId
+    );
+
     // Get the specific submission
     const record = await base("Submissions").find(submissionId);
     const fields = record.fields;
 
     // ✅ FIX: Use consistent field name - change "Vendor" to "Vendor ID"
-    const submissionVendorId = Array.isArray(fields["Vendor ID"]) // Changed from "Vendor"
+    const submissionVendorId = Array.isArray(fields["Vendor ID"])
       ? typeof fields["Vendor ID"][0] === "string"
         ? fields["Vendor ID"][0]
         : fields["Vendor ID"][0]?.id
       : null;
 
+    console.log(
+      "📊 Submission vendor ID:",
+      submissionVendorId,
+      "Current vendor ID:",
+      vendorId
+    );
+
     if (submissionVendorId !== vendorId) {
-      return res.status(403).json({ error: "Access denied" });
+      return res.status(403).json({
+        error: "Access denied - submission does not belong to this vendor",
+      });
     }
 
-    // Parse JSON fields back to objects
+    // Parse JSON fields back to objects with proper error handling
+    let integrationScores;
+    try {
+      integrationScores = fields["Integration Scores"]
+        ? JSON.parse(fields["Integration Scores"])
+        : {
+            zendesk: "",
+            oracleSql: "",
+            quickbooks: "",
+            slack: "",
+            brex: "",
+            avinode: "",
+          };
+    } catch (parseError) {
+      console.error("Error parsing integration scores:", parseError);
+      integrationScores = {
+        zendesk: "",
+        oracleSql: "",
+        quickbooks: "",
+        slack: "",
+        brex: "",
+        avinode: "",
+      };
+    }
+
+    let reference1, reference2;
+    try {
+      reference1 = fields["Reference 1"]
+        ? JSON.parse(fields["Reference 1"])
+        : { name: "", company: "", email: "", reason: "" };
+    } catch (error) {
+      reference1 = { name: "", company: "", email: "", reason: "" };
+    }
+
+    try {
+      reference2 = fields["Reference 2"]
+        ? JSON.parse(fields["Reference 2"])
+        : { name: "", company: "", email: "", reason: "" };
+    } catch (error) {
+      reference2 = { name: "", company: "", email: "", reason: "" };
+    }
+
     const submissionData = {
       id: record.id,
       companyName: fields["Company Name"] || "",
@@ -877,16 +935,7 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
       step2Questions: fields["Step 2 Questions"] || "",
 
       // Step 3 Data
-      integrationScores: fields["Integration Scores"]
-        ? JSON.parse(fields["Integration Scores"])
-        : {
-            zendesk: "",
-            oracleSql: "",
-            quickbooks: "",
-            slack: "",
-            brex: "",
-            avinode: "",
-          },
+      integrationScores: integrationScores,
       securityMeasures: fields["Security Measures"] || "",
       pciCompliant: Boolean(fields["PCI Compliant"]),
       piiCompliant: Boolean(fields["PII Compliant"]),
@@ -905,12 +954,8 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
       step4Questions: fields["Step 4 Questions"] || "",
 
       // Step 5 Data
-      reference1: fields["Reference 1"]
-        ? JSON.parse(fields["Reference 1"])
-        : { name: "", company: "", email: "", reason: "" },
-      reference2: fields["Reference 2"]
-        ? JSON.parse(fields["Reference 2"])
-        : { name: "", company: "", email: "", reason: "" },
+      reference1: reference1,
+      reference2: reference2,
       solutionFit: fields["Solution Fit"] || "",
       infoAccurate: Boolean(fields["Info Accurate"]),
       contactConsent: Boolean(fields["Contact Consent"]),
@@ -919,18 +964,34 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
       submittedAt: fields["Submission Date"] || record._rawJson.createdTime,
     };
 
+    console.log("✅ Successfully loaded submission:", submissionId);
+
     res.json({
       success: true,
       submission: submissionData,
     });
   } catch (error) {
-    console.error("Fetch submission error:", error);
+    console.error("💥 Fetch submission error:", error);
 
+    // Handle specific errors with proper JSON responses
     if (error.message?.includes("Could not find record")) {
-      return res.status(404).json({ error: "Submission not found" });
+      return res.status(404).json({
+        error: "Submission not found",
+        details: "The requested submission does not exist",
+      });
     }
 
-    res.status(500).json({ error: "Failed to load submission" });
+    if (error.message?.includes("Authentication")) {
+      return res.status(401).json({
+        error: "Authentication failed",
+        details: "Please log in again",
+      });
+    }
+
+    res.status(500).json({
+      error: "Failed to load submission",
+      details: error.message,
+    });
   }
 });
 
@@ -1807,6 +1868,27 @@ app.post("/api/admin/vendor-action", async (req, res) => {
 
     await base("Vendors").update(vendorId, updateData);
 
+    // ✅ SIMPLE N8N WEBHOOK CALL
+    try {
+      const vendorRecord = await base("Vendors").find(vendorId);
+      const vendorData = vendorRecord.fields;
+
+      // Just send the data to n8n - let n8n handle everything else
+      await axios.post(process.env.N8N_WEBHOOK_URL, {
+        vendorId: vendorId,
+        vendorName: vendorData["Vendor Name"],
+        email: vendorData["Email"],
+        contactPerson: vendorData["Contact Person"],
+        action: action, // "approve" or "decline"
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(`✅ n8n webhook triggered for vendor ${action}`);
+    } catch (webhookError) {
+      console.error("❌ n8n webhook failed:", webhookError);
+      // Don't fail the main request if webhook fails
+    }
+
     res.json({ success: true, message: `Vendor ${newStatus.toLowerCase()}` });
   } catch (error) {
     res.status(500).json({ error: "Action failed" });
@@ -1949,6 +2031,29 @@ app.get("/api/admin/submissions", async (req, res) => {
     console.error("Failed to load submissions:", error);
     res.status(500).json({ error: "Failed to load submissions" });
   }
+});
+
+// Add this at the end of your backend/index.js, before app.listen
+// Global error handling middleware
+app.use((error, req, res, next) => {
+  console.error("💥 Global error handler:", error);
+
+  // Ensure JSON response even for unhandled errors
+  res.status(500).json({
+    error: "Internal server error",
+    details:
+      process.env.NODE_ENV === "production"
+        ? "Something went wrong"
+        : error.message,
+  });
+});
+
+// Handle 404 for API routes - return JSON instead of HTML
+app.use("/api/*", (req, res) => {
+  res.status(404).json({
+    error: "API endpoint not found",
+    path: req.originalUrl,
+  });
 });
 
 // ---------- Start Server ----------
