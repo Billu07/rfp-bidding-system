@@ -1,4 +1,4 @@
-// src/components/MultiStepSubmission.tsx - WITH AIRTABLE DRAFT
+// src/components/MultiStepSubmission.tsx - WITH VENDOR DATA AUTO-POPULATION
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -15,6 +15,10 @@ import {
   Edit,
   Clock,
   AlertCircle,
+  Mail,
+  Globe,
+  Phone,
+  User,
 } from "lucide-react";
 
 interface SubmissionData {
@@ -23,7 +27,7 @@ interface SubmissionData {
   lastSaved?: string;
   submissionDate?: string;
 
-  // Step 1: Company Information
+  // Step 1: Company Information (auto-populated from vendor)
   companyName: string;
   website: string;
   contactPerson: string;
@@ -58,7 +62,7 @@ interface SubmissionData {
   projectStartDate: string;
   implementationPhases: string;
   upfrontCost: string;
-  monthlyCost: string;
+  monthlyCost: string; // Now used for long text description
   pricingDocument: File | null;
   pricingDocumentUrl?: string;
   step4Questions: string;
@@ -76,6 +80,9 @@ interface Vendor {
   name: string;
   email: string;
   contact: string;
+  phone?: string;
+  website?: string;
+  services?: string;
 }
 
 export default function MultiStepSubmission() {
@@ -128,10 +135,6 @@ export default function MultiStepSubmission() {
     infoAccurate: false,
     contactConsent: false,
   });
-
-  // Get vendor data from localStorage
-  const vendor: Vendor = JSON.parse(localStorage.getItem("vendor") || "{}");
-
   const steps = [
     { number: 1, title: "Company Info", icon: Building },
     { number: 2, title: "Solution Fit", icon: Workflow },
@@ -140,11 +143,38 @@ export default function MultiStepSubmission() {
     { number: 5, title: "References & Fit", icon: Users },
   ];
 
-  // Replace your current useEffect with this optimized version
+  // Load vendor data from localStorage and auto-populate company info
+  // Load vendor data from localStorage and auto-populate company info
+  useEffect(() => {
+    const loadVendorData = () => {
+      try {
+        const vendorData = localStorage.getItem("vendor");
+        if (vendorData) {
+          const vendorObj: Vendor = JSON.parse(vendorData);
+
+          // Auto-populate company information from vendor data directly
+          setFormData((prev) => ({
+            ...prev,
+            companyName: vendorObj.name || "",
+            contactPerson: vendorObj.contact || "",
+            email: vendorObj.email || "",
+            phone: vendorObj.phone || "",
+            website: vendorObj.website || "",
+            companyDescription: vendorObj.services || "",
+          }));
+        }
+      } catch (error) {
+        console.error("Error loading vendor data:", error);
+      }
+    };
+
+    loadVendorData();
+  }, []);
+
+  // Auto-save functionality
   useEffect(() => {
     if (currentStep > 1 && hasUnsavedChanges) {
       const autoSave = setTimeout(() => {
-        // Only auto-save if we have meaningful data
         const hasData = Object.values(formData).some((value) => {
           if (typeof value === "string") return value.trim().length > 0;
           if (typeof value === "object" && value !== null) {
@@ -160,7 +190,7 @@ export default function MultiStepSubmission() {
         if (hasData) {
           saveDraft();
         }
-      }, 2000); // Increased to 2 seconds to reduce API calls
+      }, 2000);
 
       return () => clearTimeout(autoSave);
     }
@@ -172,20 +202,17 @@ export default function MultiStepSubmission() {
       console.log("🎯 Component mounted, submissionId:", submissionId);
 
       if (submissionId) {
-        // Editing existing submission - LOAD FROM SUBMISSIONS TABLE
         console.log("📥 Loading EXISTING submission for editing");
         await loadExistingSubmission();
       } else {
-        // Creating new submission - check for draft
         console.log("📥 Creating NEW submission, checking for draft");
         await loadDraft();
       }
     };
 
     loadData();
-  }, [submissionId]); // Only depend on submissionId
+  }, [submissionId]);
 
-  // In MultiStepSubmission.tsx - FIX the loadExistingSubmission function
   const loadExistingSubmission = async () => {
     setIsEditing(true);
     try {
@@ -199,7 +226,6 @@ export default function MultiStepSubmission() {
 
       console.log("🔍 Loading EXISTING SUBMISSION for editing:", submissionId);
 
-      // Use the correct endpoint for loading submissions
       const response = await fetch(`/api/vendor/submissions/${submissionId}`, {
         headers: {
           "X-Vendor-Data": JSON.stringify(vendor),
@@ -247,7 +273,6 @@ export default function MultiStepSubmission() {
       const vendor = JSON.parse(vendorData);
       console.log("👤 Loading draft for vendor:", vendor.id);
 
-      console.log("🌐 Making API call to /api/load-draft...");
       const response = await fetch("/api/load-draft", {
         headers: {
           "X-Vendor-Data": JSON.stringify({ id: vendor.id }),
@@ -262,7 +287,21 @@ export default function MultiStepSubmission() {
 
       if (result.success && result.draft) {
         console.log("🎉 Draft found! Data:", result.draft);
-        setFormData(result.draft);
+
+        // Merge draft data with vendor data (vendor data takes precedence for company info)
+        const mergedData = {
+          ...result.draft,
+          // Keep vendor data for company info fields, use draft for others
+          companyName: vendor.name || result.draft.companyName,
+          contactPerson: vendor.contact || result.draft.contactPerson,
+          email: vendor.email || result.draft.email,
+          phone: vendor.phone || result.draft.phone,
+          website: vendor.website || result.draft.website,
+          companyDescription:
+            vendor.services || result.draft.companyDescription,
+        };
+
+        setFormData(mergedData);
         setLastSaved(new Date(result.lastSaved).toLocaleString());
         setHasUnsavedChanges(false);
         console.log("🚀 Draft loaded successfully into form state");
@@ -301,7 +340,6 @@ export default function MultiStepSubmission() {
     []
   );
 
-  /// Save draft to Airtable - FIXED VERSION
   const saveDraft = async () => {
     setSaveStatus("saving");
 
@@ -366,6 +404,12 @@ export default function MultiStepSubmission() {
           ? `/api/update-submission/${submissionId}`
           : "/api/submit-proposal";
 
+      const vendorData = localStorage.getItem("vendor");
+      if (!vendorData) {
+        throw new Error("Vendor data not found");
+      }
+      const vendor = JSON.parse(vendorData);
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -406,7 +450,7 @@ export default function MultiStepSubmission() {
 
   const nextStep = () => {
     if (hasUnsavedChanges) {
-      saveDraft(); // Save before moving to next step
+      saveDraft();
     }
     if (currentStep < 5) {
       setCurrentStep(currentStep + 1);
@@ -416,7 +460,7 @@ export default function MultiStepSubmission() {
 
   const prevStep = () => {
     if (hasUnsavedChanges) {
-      saveDraft(); // Save before moving to previous step
+      saveDraft();
     }
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
@@ -456,7 +500,7 @@ export default function MultiStepSubmission() {
 
   const completionPercentage = calculateCompletion();
 
-  // [Keep all your existing renderStep functions - they remain exactly the same]
+  // Step 1: Company Information (Display only with vendor data)
   const renderStep1 = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -465,7 +509,8 @@ export default function MultiStepSubmission() {
             Company Information
           </h3>
           <p className="text-gray-600">
-            Tell us about your company and primary contact.
+            Your company details from registration. Contact support to update
+            this information.
           </p>
         </div>
         {isEditing && (
@@ -476,74 +521,101 @@ export default function MultiStepSubmission() {
         )}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Company Name *
-          </label>
-          <input
-            type="text"
-            value={formData.companyName}
-            onChange={(e) => handleInputChange("companyName", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            required
-          />
+      {/* Vendor Information Display */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <h4 className="text-md font-semibold text-blue-900 mb-4 flex items-center">
+          <Building className="w-5 h-5 mr-2" />
+          Registered Company Information
+        </h4>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <Building className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <label className="block text-sm font-medium text-blue-700">
+                  Company Name
+                </label>
+                <p className="text-gray-900 font-medium">
+                  {formData.companyName || "Not provided"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-3">
+              <User className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <label className="block text-sm font-medium text-blue-700">
+                  Contact Person
+                </label>
+                <p className="text-gray-900 font-medium">
+                  {formData.contactPerson || "Not provided"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-3">
+              <Mail className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <label className="block text-sm font-medium text-blue-700">
+                  Email Address
+                </label>
+                <p className="text-gray-900">
+                  {formData.email || "Not provided"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <Phone className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <label className="block text-sm font-medium text-blue-700">
+                  Phone Number
+                </label>
+                <p className="text-gray-900">
+                  {formData.phone || "Not provided"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-3">
+              <Globe className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <label className="block text-sm font-medium text-blue-700">
+                  Website
+                </label>
+                <p className="text-gray-900">
+                  {formData.website || "Not provided"}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Website URL
-          </label>
-          <input
-            type="url"
-            value={formData.website}
-            onChange={(e) => handleInputChange("website", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Contact Person Name *
-          </label>
-          <input
-            type="text"
-            value={formData.contactPerson}
-            onChange={(e) => handleInputChange("contactPerson", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email Address *
-          </label>
-          <input
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange("email", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Phone Number
-          </label>
-          <input
-            type="tel"
-            value={formData.phone}
-            onChange={(e) => handleInputChange("phone", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
+        <div className="mt-6 p-4 bg-blue-100 rounded-lg border border-blue-300">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Need to update your company information?
+              </p>
+              <p className="text-sm text-blue-700 mt-1">
+                Contact support to update your registered company details. This
+                ensures consistency across all your submissions.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* Company Description - Only editable field in this step */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Short Company Description (500 characters max) *
+          Company Description & Expertise *
         </label>
         <textarea
           value={formData.companyDescription}
@@ -553,6 +625,7 @@ export default function MultiStepSubmission() {
           maxLength={500}
           rows={4}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          placeholder="Describe your company's expertise, services, and why you're a good fit for this RFP..."
           required
         />
         <div className="text-sm text-gray-500 mt-1">
@@ -562,7 +635,7 @@ export default function MultiStepSubmission() {
     </div>
   );
 
-  // Step 2: Solution Fit & Use Cases
+  // Step 2: Solution Fit & Use Cases (unchanged)
   const renderStep2 = () => (
     <div className="space-y-8">
       <div>
@@ -682,7 +755,8 @@ export default function MultiStepSubmission() {
       </div>
     </div>
   );
-  // Step 3: Technical Capabilities & Compliance
+
+  // Step 3: Technical Capabilities & Compliance (unchanged)
   const renderStep3 = () => (
     <div className="space-y-8">
       <div>
@@ -703,6 +777,31 @@ export default function MultiStepSubmission() {
           For each item below, select one of three options:
         </p>
 
+        {/* Integration Legend */}
+        <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200">
+          <h5 className="text-sm font-semibold text-gray-900 mb-3">
+            What the icons mean:
+          </h5>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="flex items-center space-x-2">
+              <span className="text-green-600 font-medium">✅</span>
+              <span className="text-gray-700">
+                Can integrate and have done previously
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-yellow-600 font-medium">⚙️</span>
+              <span className="text-gray-700">
+                Can integrate but have not done previously
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-red-600 font-medium">❌</span>
+              <span className="text-gray-700">Cannot integrate</span>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-4">
           {[
             { key: "zendesk", label: "Zendesk" },
@@ -714,32 +813,35 @@ export default function MultiStepSubmission() {
           ].map((integration) => (
             <div
               key={integration.key}
-              className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200"
+              className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white rounded-lg border border-gray-200 space-y-3 md:space-y-0"
             >
-              <span className="font-medium text-gray-900">
+              <span className="font-medium text-gray-900 md:w-1/4">
                 {integration.label}
               </span>
-              <div className="flex gap-4">
+              <div className="flex gap-4 md:flex-1 md:justify-center">
                 {[
                   {
                     value: "can-integrate",
                     label: "✅ Can integrate and have done previously",
                     color: "text-green-600",
+                    shortLabel: "✅ Have integrated",
                   },
                   {
                     value: "can-integrate-not-done",
                     label: "⚙️ Can integrate but have not done previously",
                     color: "text-yellow-600",
+                    shortLabel: "⚙️ Can integrate",
                   },
                   {
                     value: "cannot-integrate",
                     label: "❌ Cannot integrate",
                     color: "text-red-600",
+                    shortLabel: "❌ Cannot integrate",
                   },
                 ].map((option) => (
                   <label
                     key={option.value}
-                    className="flex items-center gap-2 cursor-pointer"
+                    className="flex items-center gap-2 cursor-pointer group"
                   >
                     <input
                       type="radio"
@@ -758,8 +860,11 @@ export default function MultiStepSubmission() {
                       }
                       className="text-blue-600 focus:ring-blue-500"
                     />
-                    <span className={`text-sm ${option.color}`}>
-                      {option.label.split(" ")[0]}
+                    <span
+                      className={`text-sm ${option.color} font-medium group-hover:underline`}
+                      title={option.label}
+                    >
+                      {option.shortLabel}
                     </span>
                   </label>
                 ))}
@@ -833,7 +938,8 @@ export default function MultiStepSubmission() {
       </div>
     </div>
   );
-  // Step 4: Implementation & Pricing
+
+  // Step 4: Implementation & Pricing (unchanged)
   const renderStep4 = () => (
     <div className="space-y-8">
       <div>
@@ -913,17 +1019,18 @@ export default function MultiStepSubmission() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Please outline your monthly License/Maintenance/Support costs ($)
+            Please outline your monthly License/Maintenance/Support costs
           </label>
-          <input
-            type="number"
+          <textarea
             value={formData.monthlyCost}
             onChange={(e) => handleInputChange("monthlyCost", e.target.value)}
+            rows={4}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="0"
-            min="0"
-            step="0.01"
+            placeholder="Describe your monthly licensing, maintenance, and support costs in detail. Include any tiered pricing, per-user costs, or additional fees."
           />
+          <p className="text-sm text-gray-500 mt-1">
+            Provide detailed breakdown of all recurring costs
+          </p>
         </div>
       </div>
 
@@ -958,7 +1065,7 @@ export default function MultiStepSubmission() {
       </div>
     </div>
   );
-  // Step 5: References & Fit
+  // Step 5: References & Fit (unchanged)
   const renderStep5 = () => (
     <div className="space-y-8">
       <div>

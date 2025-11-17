@@ -1,5 +1,4 @@
-// frontend/src/components/LandingPage.tsx - UPDATED WITH VIDEO & BLUR
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Lock,
   ArrowRight,
@@ -16,12 +15,15 @@ import {
   Calendar,
   LogOut,
   Lock as LockIcon,
+  X,
+  Sparkles,
 } from "lucide-react";
 
 export default function LandingPage() {
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState("");
+  const [showGuidance, setShowGuidance] = useState(false);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +40,17 @@ export default function LandingPage() {
       setError("Invalid password. Please try again.");
     }
   };
+
+  // Show guidance popup when vendor logs in and content unlocks
+  useEffect(() => {
+    const vendor = localStorage.getItem("vendor");
+    const hasSeenGuidance = sessionStorage.getItem("hasSeenGuidance");
+
+    if (vendor && !hasSeenGuidance && isAuthenticated) {
+      setShowGuidance(true);
+      sessionStorage.setItem("hasSeenGuidance", "true");
+    }
+  }, [isAuthenticated]);
 
   // Check if already authenticated in this session
   if (!isAuthenticated && !sessionStorage.getItem("rfp_authenticated")) {
@@ -90,8 +103,78 @@ export default function LandingPage() {
   // RFP CONTENT (shown after password authentication)
   return (
     <div className="min-h-screen bg-white">
+      {/* Guidance Popup */}
+      {showGuidance && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-auto transform animate-scaleIn">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  Welcome Back!
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowGuidance(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Eye className="w-8 h-8 text-green-600" />
+                </div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                  Full RFP Content Unlocked!
+                </h4>
+                <p className="text-gray-600 mb-4 leading-relaxed">
+                  You now have access to the complete RFP documentation
+                  including detailed requirements, technical specifications, and
+                  submission guidelines.
+                </p>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left">
+                  <h5 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                    <ArrowRight className="w-4 h-4" />
+                    What to do next:
+                  </h5>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    <li className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      Scroll down to review detailed RFP requirements
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      Watch the overview video for context
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      Start your submission when ready
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowGuidance(false)}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all text-center"
+              >
+                Start Exploring
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-white border-b border-gray-200">
+      <nav className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-2">
@@ -100,10 +183,10 @@ export default function LandingPage() {
                 Private Aviation RFP
               </span>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               {localStorage.getItem("vendor") ||
               localStorage.getItem("admin") ? (
-                // Show dashboard links and logout when logged in
+                // UPDATED: Better header buttons for logged-in users
                 <>
                   <a
                     href={
@@ -111,40 +194,51 @@ export default function LandingPage() {
                         ? "/admin/dashboard"
                         : "/dashboard"
                     }
-                    className="text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200 flex items-center gap-2"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-blue-600 font-medium transition-all duration-200 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200"
                   >
                     <BarChart3 className="w-4 h-4" />
-                    {localStorage.getItem("admin")
-                      ? "Admin Dashboard"
-                      : "Vendor Dashboard"}
+                    Dashboard
                   </a>
+
+                  {localStorage.getItem("vendor") && (
+                    <a
+                      href="/submit-proposal"
+                      className="inline-flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-green-600 font-medium transition-all duration-200 hover:bg-green-50 rounded-lg border border-transparent hover:border-green-200"
+                    >
+                      <FileText className="w-4 h-4" />
+                      New Submission
+                    </a>
+                  )}
+
                   <a
                     href="/"
-                    className="text-gray-600 hover:text-purple-600 font-medium transition-colors duration-200 flex items-center gap-2"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-purple-600 font-medium transition-all duration-200 hover:bg-purple-50 rounded-lg border border-transparent hover:border-purple-200"
                   >
                     <Eye className="w-4 h-4" />
                     View RFP
                   </a>
+
                   <button
                     onClick={() => {
                       localStorage.removeItem("vendor");
                       localStorage.removeItem("admin");
+                      sessionStorage.removeItem("hasSeenGuidance");
                       window.location.href = "/";
                     }}
-                    className="flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 font-medium border border-red-200 hover:border-red-300 rounded-xl hover:bg-red-50 transition-all duration-200"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 font-medium transition-all duration-200 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200"
                   >
                     <LogOut className="w-4 h-4" />
                     Logout
                   </button>
                 </>
               ) : (
-                // Show single prominent login button when not logged in
+                // UPDATED: Better login button design
                 <a
                   href="/login"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-6 py-3 rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300 flex items-center gap-2"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-200 shadow-md"
                 >
                   <Lock className="w-4 h-4" />
-                  Access Portal
+                  Vendor Portal
                 </a>
               )}
             </div>
@@ -177,13 +271,27 @@ export default function LandingPage() {
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href="/register"
-              className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
-            >
-              Begin Submission
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </a>
+            {/* FIXED: "Begin Submission" button logic */}
+            {localStorage.getItem("vendor") ? (
+              // If vendor is logged in, go to new submission
+              <a
+                href="/submit-proposal"
+                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+              >
+                Begin Submission
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </a>
+            ) : (
+              // If not logged in, go to registration
+              <a
+                href="/register"
+                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+              >
+                Begin Submission
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </a>
+            )}
+
             {!localStorage.getItem("vendor") &&
               !localStorage.getItem("admin") && (
                 <a
@@ -195,6 +303,19 @@ export default function LandingPage() {
                 </a>
               )}
           </div>
+
+          {/* Scroll indicator for logged-in vendors */}
+          {(localStorage.getItem("vendor") ||
+            localStorage.getItem("admin")) && (
+            <div className="mt-12 animate-bounce">
+              <div className="flex flex-col items-center text-blue-600">
+                <span className="text-sm font-medium mb-2">
+                  Scroll to explore RFP details
+                </span>
+                <ArrowRight className="h-5 w-5 transform rotate-90" />
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

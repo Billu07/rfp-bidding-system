@@ -200,7 +200,7 @@ export default function Dashboard() {
                   className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center gap-2 text-gray-600 hover:text-blue-600"
                 >
                   <Eye className="w-4 h-4" />
-                  View RFP
+                  Back to Home
                 </a>
               </nav>
             </div>
