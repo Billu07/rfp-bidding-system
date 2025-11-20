@@ -19,8 +19,8 @@ import {
   Globe,
   Phone,
   User,
+  PlayCircle,
 } from "lucide-react";
-
 interface SubmissionData {
   id?: string;
   status?: "draft" | "submitted" | "pending" | "approved" | "rejected";
@@ -96,6 +96,7 @@ export default function MultiStepSubmission() {
   const [isEditing, setIsEditing] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [stepErrors, setStepErrors] = useState<{ [key: number]: string[] }>({});
 
   const [formData, setFormData] = useState<SubmissionData>({
     companyName: "",
@@ -142,6 +143,81 @@ export default function MultiStepSubmission() {
     { number: 4, title: "Implementation & Pricing", icon: Calendar },
     { number: 5, title: "References & Fit", icon: Users },
   ];
+
+  // Validation functions for each step
+  const validateStep = (step: number): boolean => {
+    const errors: string[] = [];
+
+    switch (step) {
+      case 1:
+        if (!formData.companyDescription.trim()) {
+          errors.push("Company description is required");
+        }
+        break;
+
+      case 2:
+        if (!formData.clientWorkflowDescription.trim()) {
+          errors.push("Client workflow description is required");
+        }
+        if (!formData.requestCaptureDescription.trim()) {
+          errors.push("Request capture description is required");
+        }
+        if (!formData.internalWorkflowDescription.trim()) {
+          errors.push("Internal workflow description is required");
+        }
+        if (!formData.reportingCapabilities.trim()) {
+          errors.push("Reporting capabilities description is required");
+        }
+        if (!formData.dataArchitecture.trim()) {
+          errors.push("Data architecture description is required");
+        }
+        break;
+
+      case 3:
+        if (!formData.securityMeasures.trim()) {
+          errors.push("Security measures description is required");
+        }
+        // Check if all integration scores are filled
+        const integrationKeys = Object.keys(formData.integrationScores);
+        const missingIntegrations = integrationKeys.filter(
+          (key) =>
+            !formData.integrationScores[
+              key as keyof typeof formData.integrationScores
+            ]
+        );
+        if (missingIntegrations.length > 0) {
+          errors.push("Please select integration capability for all systems");
+        }
+        break;
+
+      case 4:
+        if (!formData.implementationTimeline.trim()) {
+          errors.push("Implementation timeline is required");
+        }
+        if (!formData.projectStartDate.trim()) {
+          errors.push("Project start date is required");
+        }
+        if (!formData.implementationPhases.trim()) {
+          errors.push("Implementation phases description is required");
+        }
+        break;
+
+      case 5:
+        if (!formData.solutionFit.trim()) {
+          errors.push("Solution fit description is required");
+        }
+        if (!formData.infoAccurate) {
+          errors.push("You must confirm the information is accurate");
+        }
+        if (!formData.contactConsent) {
+          errors.push("You must consent to being contacted");
+        }
+        break;
+    }
+
+    setStepErrors((prev) => ({ ...prev, [step]: errors }));
+    return errors.length === 0;
+  };
 
   // Load vendor data from localStorage and auto-populate company info
   // Load vendor data from localStorage and auto-populate company info
@@ -391,6 +467,14 @@ export default function MultiStepSubmission() {
   };
 
   const handleSubmit = async () => {
+    // Validate all steps before submission
+    const allStepsValid = [1, 2, 3, 4, 5].every((step) => validateStep(step));
+
+    if (!allStepsValid) {
+      alert("Please complete all required fields before submitting.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const submissionData = {
@@ -449,6 +533,11 @@ export default function MultiStepSubmission() {
   };
 
   const nextStep = () => {
+    // Validate current step before proceeding
+    if (!validateStep(currentStep)) {
+      return;
+    }
+
     if (hasUnsavedChanges) {
       saveDraft();
     }
@@ -520,6 +609,23 @@ export default function MultiStepSubmission() {
           </span>
         )}
       </div>
+
+      {/* Error Alert */}
+      {stepErrors[1] && stepErrors[1].length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center text-red-800 mb-2">
+            <AlertCircle className="w-5 h-5 mr-2" />
+            <span className="font-medium">
+              Please fix the following issues:
+            </span>
+          </div>
+          <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+            {stepErrors[1].map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Vendor Information Display */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
@@ -635,7 +741,7 @@ export default function MultiStepSubmission() {
     </div>
   );
 
-  // Step 2: Solution Fit & Use Cases (unchanged)
+  // Step 2: Solution Fit & Use Cases (with video guidance)
   const renderStep2 = () => (
     <div className="space-y-8">
       <div>
@@ -647,6 +753,48 @@ export default function MultiStepSubmission() {
           workflow needs.
         </p>
       </div>
+
+      {/* Video Guidance */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-center mb-4">
+          <PlayCircle className="w-6 h-6 text-blue-600 mr-2" />
+          <h4 className="text-lg font-semibold text-blue-900">
+            Step 1 Guidance Video
+          </h4>
+        </div>
+        <p className="text-blue-700 mb-4">
+          Watch this short video to understand how to best complete the Solution
+          Fit section:
+        </p>
+        <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+          {" "}
+          {/* 16:9 aspect ratio */}
+          <iframe
+            src="https://www.youtube.com/embed/eqmi-SZuH78"
+            title="Step 2 Guidance: Solution Fit & Use Cases"
+            className="absolute top-0 left-0 w-full h-full rounded-lg"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          ></iframe>
+        </div>
+      </div>
+
+      {/* Error Alert */}
+      {stepErrors[2] && stepErrors[2].length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center text-red-800 mb-2">
+            <AlertCircle className="w-5 h-5 mr-2" />
+            <span className="font-medium">
+              Please fix the following issues:
+            </span>
+          </div>
+          <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+            {stepErrors[2].map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="space-y-6">
         <div>
@@ -756,7 +904,7 @@ export default function MultiStepSubmission() {
     </div>
   );
 
-  // Step 3: Technical Capabilities & Compliance (unchanged)
+  // Step 3: Technical Capabilities & Compliance (with video guidance)
   const renderStep3 = () => (
     <div className="space-y-8">
       <div>
@@ -767,6 +915,48 @@ export default function MultiStepSubmission() {
           Assess your integration capabilities and security compliance.
         </p>
       </div>
+
+      {/* Video Guidance */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-center mb-4">
+          <PlayCircle className="w-6 h-6 text-blue-600 mr-2" />
+          <h4 className="text-lg font-semibold text-blue-900">
+            Step 2 Guidance Video
+          </h4>
+        </div>
+        <p className="text-blue-700 mb-4">
+          Watch this video for guidance on completing the Technical Capabilities
+          section:
+        </p>
+        <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+          {" "}
+          {/* 16:9 aspect ratio */}
+          <iframe
+            src="https://www.youtube.com/embed/94iOye1X5mU"
+            title="Step 3 Guidance: Technical Capabilities & Compliance"
+            className="absolute top-0 left-0 w-full h-full rounded-lg"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          ></iframe>
+        </div>
+      </div>
+
+      {/* Error Alert */}
+      {stepErrors[3] && stepErrors[3].length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center text-red-800 mb-2">
+            <AlertCircle className="w-5 h-5 mr-2" />
+            <span className="font-medium">
+              Please fix the following issues:
+            </span>
+          </div>
+          <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+            {stepErrors[3].map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Integration Capabilities Matrix */}
       <div className="bg-gray-50 rounded-xl p-6">
@@ -939,7 +1129,7 @@ export default function MultiStepSubmission() {
     </div>
   );
 
-  // Step 4: Implementation & Pricing (unchanged)
+  // Step 4: Implementation & Pricing (with video guidance)
   const renderStep4 = () => (
     <div className="space-y-8">
       <div>
@@ -950,6 +1140,48 @@ export default function MultiStepSubmission() {
           Outline your implementation approach and cost structure.
         </p>
       </div>
+
+      {/* Video Guidance */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-center mb-4">
+          <PlayCircle className="w-6 h-6 text-blue-600 mr-2" />
+          <h4 className="text-lg font-semibold text-blue-900">
+            Step 3 Guidance Video
+          </h4>
+        </div>
+        <p className="text-blue-700 mb-4">
+          Watch this video for guidance on completing the Implementation &
+          Pricing section:
+        </p>
+        <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+          {" "}
+          {/* 16:9 aspect ratio */}
+          <iframe
+            src="https://www.youtube.com/embed/Lp4xbKHTG-o"
+            title="Step 4 Guidance: Implementation & Pricing"
+            className="absolute top-0 left-0 w-full h-full rounded-lg"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          ></iframe>
+        </div>
+      </div>
+
+      {/* Error Alert */}
+      {stepErrors[4] && stepErrors[4].length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center text-red-800 mb-2">
+            <AlertCircle className="w-5 h-5 mr-2" />
+            <span className="font-medium">
+              Please fix the following issues:
+            </span>
+          </div>
+          <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+            {stepErrors[4].map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         <div>
@@ -1065,7 +1297,8 @@ export default function MultiStepSubmission() {
       </div>
     </div>
   );
-  // Step 5: References & Fit (unchanged)
+
+  // Step 5: References & Fit (with video guidance)
   const renderStep5 = () => (
     <div className="space-y-8">
       <div>
@@ -1076,6 +1309,48 @@ export default function MultiStepSubmission() {
           Provide references and explain why your solution is the right fit.
         </p>
       </div>
+
+      {/* Video Guidance */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-center mb-4">
+          <PlayCircle className="w-6 h-6 text-blue-600 mr-2" />
+          <h4 className="text-lg font-semibold text-blue-900">
+            Step 4 Guidance Video
+          </h4>
+        </div>
+        <p className="text-blue-700 mb-4">
+          Watch this video for guidance on completing the References & Fit
+          section:
+        </p>
+        <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+          {" "}
+          {/* 16:9 aspect ratio */}
+          <iframe
+            src="https://www.youtube.com/embed/NDUUkzPJoTM"
+            title="Step 5 Guidance: References & Fit"
+            className="absolute top-0 left-0 w-full h-full rounded-lg"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          ></iframe>
+        </div>
+      </div>
+
+      {/* Error Alert */}
+      {stepErrors[5] && stepErrors[5].length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center text-red-800 mb-2">
+            <AlertCircle className="w-5 h-5 mr-2" />
+            <span className="font-medium">
+              Please fix the following issues:
+            </span>
+          </div>
+          <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+            {stepErrors[5].map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="space-y-6">
         {/* Reference 1 */}

@@ -568,39 +568,31 @@ app.delete("/api/cleanup-old-drafts", async (req, res) => {
 // ---------- Submit Aviation RFP Proposal ----------
 app.post("/api/submit-proposal", verifyVendor, async (req, res) => {
   try {
-    const {
-      // Step 1: Company Information
-      companyName,
-      website,
-      contactPerson,
-      email,
-      phone,
-      companyDescription,
+    const vendorId = req.vendor.id;
 
-      // Step 2: Solution Fit
+    // Get vendor data first
+    const vendorRecord = await base("Vendors").find(vendorId);
+    const vendorFields = vendorRecord.fields;
+
+    const {
+      // Keep only submission-specific fields
       clientWorkflowDescription,
       requestCaptureDescription,
       internalWorkflowDescription,
       reportingCapabilities,
       dataArchitecture,
       step2Questions,
-
-      // Step 3: Technical Capabilities
       integrationScores,
       securityMeasures,
       pciCompliant,
       piiCompliant,
       step3Questions,
-
-      // Step 4: Implementation & Pricing
       implementationTimeline,
       projectStartDate,
       implementationPhases,
       upfrontCost,
       monthlyCost,
       step4Questions,
-
-      // Step 5: References & Fit
       reference1,
       reference2,
       solutionFit,
@@ -608,38 +600,29 @@ app.post("/api/submit-proposal", verifyVendor, async (req, res) => {
       contactConsent,
     } = req.body;
 
-    const vendorId = req.vendor.id;
-
-    // Validate required fields
+    // Validate required fields (excluding company info since it comes from vendor)
     if (
-      !companyName ||
-      !contactPerson ||
-      !email ||
-      !clientWorkflowDescription
+      !clientWorkflowDescription ||
+      !requestCaptureDescription ||
+      !internalWorkflowDescription
     ) {
       return res.status(400).json({ error: "Required fields missing" });
     }
 
     // Verify vendor exists and is approved
-    let vendorRecord;
-    try {
-      vendorRecord = await base("Vendors").find(vendorId);
-      if (vendorRecord.fields["Status"] !== "Approved") {
-        return res.status(403).json({ error: "Vendor account not approved" });
-      }
-    } catch (vendorError) {
-      return res.status(404).json({ error: "Vendor not found" });
+    if (vendorFields["Status"] !== "Approved") {
+      return res.status(403).json({ error: "Vendor account not approved" });
     }
 
-    // Create submission record
+    // Create submission record with vendor data
     const submissionData = {
       "Vendor ID": [vendorId],
-      "Company Name": companyName,
-      Website: website,
-      "Contact Person": contactPerson,
-      Email: email,
-      Phone: phone,
-      "Company Description": companyDescription,
+      "Company Name": vendorFields["Vendor Name"] || "",
+      Website: vendorFields["Website"] || "",
+      "Contact Person": vendorFields["Contact Person"] || "",
+      Email: vendorFields["Email"] || "",
+      Phone: vendorFields["Phone"] || "",
+      "Company Description": vendorFields["Services"] || "",
 
       // Step 2 Data
       "Client Workflow Description": clientWorkflowDescription,
@@ -661,7 +644,7 @@ app.post("/api/submit-proposal", verifyVendor, async (req, res) => {
       "Project Start Date": projectStartDate,
       "Implementation Phases": implementationPhases,
       "Upfront Cost": upfrontCost ? parseFloat(upfrontCost) : 0,
-      "Monthly Cost": monthlyCost ? parseFloat(monthlyCost) : 0,
+      "Monthly Cost": monthlyCost || "",
       "Step 4 Questions": step4Questions,
 
       // Step 5 Data
@@ -995,18 +978,16 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
   }
 });
 
-// ---------- Update Submission ----------
+// Update Vendor Submission
 app.post("/api/update-submission/:id", verifyVendor, async (req, res) => {
   try {
     const submissionId = req.params.id;
     const vendorId = req.vendor.id;
+
+    const vendorRecord = await base("Vendors").find(vendorId);
+    const vendorFields = vendorRecord.fields;
+
     const {
-      companyName,
-      website,
-      contactPerson,
-      email,
-      phone,
-      companyDescription,
       clientWorkflowDescription,
       requestCaptureDescription,
       internalWorkflowDescription,
@@ -1043,14 +1024,14 @@ app.post("/api/update-submission/:id", verifyVendor, async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Update submission record
+    // Update submission record with vendor data
     const updateData = {
-      "Company Name": companyName,
-      Website: website,
-      "Contact Person": contactPerson,
-      Email: email,
-      Phone: phone,
-      "Company Description": companyDescription,
+      "Company Name": vendorFields["Vendor Name"] || "",
+      Website: vendorFields["Website"] || "",
+      "Contact Person": vendorFields["Contact Person"] || "",
+      Email: vendorFields["Email"] || "",
+      Phone: vendorFields["Phone"] || "",
+      "Company Description": vendorFields["Services"] || "",
 
       // Step 2 Data
       "Client Workflow Description": clientWorkflowDescription,
@@ -1072,7 +1053,7 @@ app.post("/api/update-submission/:id", verifyVendor, async (req, res) => {
       "Project Start Date": projectStartDate,
       "Implementation Phases": implementationPhases,
       "Upfront Cost": upfrontCost ? parseFloat(upfrontCost) : 0,
-      "Monthly Cost": monthlyCost ? parseFloat(monthlyCost) : 0,
+      "Monthly Cost": monthlyCost || "",
       "Step 4 Questions": step4Questions,
 
       // Step 5 Data
