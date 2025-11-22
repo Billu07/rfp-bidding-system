@@ -737,8 +737,8 @@ export default function LandingPage() {
                 <div className="w-24 h-1 bg-gradient-to-r from-orange-600 to-red-600 mx-auto"></div>
               </div>
 
-              <div className="bg-white rounded-2xl p-8 shadow-sm border border-orange-200">
-                <div className="flex items-center mb-6">
+              <div className="bg-white rounded-2xl p-8 shadow-sm border border-orange-200 text-center">
+                <div className="flex items-center mb-6 justify-center">
                   <div className="w-12 h-12 bg-orange-600 rounded-xl flex items-center justify-center mr-4">
                     <FileText className="h-6 w-6 text-white" />
                   </div>
@@ -752,38 +752,26 @@ export default function LandingPage() {
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-8 mb-6">
+                <div className="max-w-2xl mx-auto mb-6">
                   <div className="space-y-4">
-                    <div className="flex items-start">
+                    <div className="flex items-start justify-center">
                       <CheckCircle className="h-5 w-5 text-green-600 mr-3 mt-0.5 flex-shrink-0" />
                       <span className="text-gray-700">
                         Download and review the NDA document
                       </span>
                     </div>
-                    <div className="flex items-start">
+                    <div className="flex items-start justify-center">
                       <CheckCircle className="h-5 w-5 text-green-600 mr-3 mt-0.5 flex-shrink-0" />
                       <span className="text-gray-700">
                         Sign the NDA with your company details
                       </span>
                     </div>
-                    <div className="flex items-start">
+                    <div className="flex items-start justify-center">
                       <CheckCircle className="h-5 w-5 text-green-600 mr-3 mt-0.5 flex-shrink-0" />
                       <span className="text-gray-700">
                         Upload the signed NDA during registration
                       </span>
                     </div>
-                  </div>
-
-                  <div className="bg-orange-50 rounded-xl p-6 border border-orange-200">
-                    <h4 className="font-semibold text-orange-900 mb-3">
-                      Brand Anonymity
-                    </h4>
-                    <p className="text-orange-800 text-sm leading-relaxed">
-                      Refer only to the client as{" "}
-                      <em>"a luxury credit card and concierge company"</em>.
-                      Company identity will be revealed only after NDA
-                      execution.
-                    </p>
                   </div>
                 </div>
 
