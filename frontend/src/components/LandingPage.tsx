@@ -199,7 +199,6 @@ export default function LandingPage() {
                     <BarChart3 className="w-4 h-4" />
                     Dashboard
                   </a>
-
                   {localStorage.getItem("vendor") && (
                     <a
                       href="/submit-proposal"

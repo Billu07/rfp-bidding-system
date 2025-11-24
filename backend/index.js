@@ -37,7 +37,7 @@ const base = new Airtable({
 app.use(
   cors({
     origin: [
-      "https://rfp-frontend-weld.vercel.app",
+      "https://rfp-frontend-seven.vercel.app/",
       "http://localhost:3000",
       "http://localhost:5173",
     ],
