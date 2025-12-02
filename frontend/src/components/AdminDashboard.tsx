@@ -10,6 +10,7 @@ import {
   FileText,
   Search,
   CheckCircle,
+  Download,
   Loader2,
   LogOut,
   Mail,
@@ -18,6 +19,7 @@ import {
   Clock,
   BarChart3,
   X,
+  Eye,
   RefreshCw,
   Target,
   MessageSquare,
@@ -26,9 +28,9 @@ import {
   Briefcase,
   ChevronRight,
   Filter,
+  Home,
 } from "lucide-react";
 
-// --- Interfaces ---
 interface Submission {
   id: string;
   rfpName: string;
@@ -55,6 +57,7 @@ interface Submission {
   implementationPhases?: string;
   upfrontCost?: number | string;
   monthlyCost?: string;
+  pricingDocUrl?: string;
   reference1?: { name: string; company: string; email: string; reason: string };
   reference2?: { name: string; company: string; email: string; reason: string };
   solutionFit?: string;
@@ -116,9 +119,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     Approved: "bg-emerald-100 text-emerald-700 border-emerald-200",
     Rejected: "bg-red-100 text-red-700 border-red-200",
   };
-
   const defaultStyle = "bg-slate-100 text-slate-700 border-slate-200";
-
   return (
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
@@ -139,19 +140,17 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [showNdaPreview, setShowNdaPreview] = useState<string | null>(null);
-
   const [showSubmissionModal, setShowSubmissionModal] = useState<{
     show: boolean;
     submission: Submission | null;
     action: string;
   }>({ show: false, submission: null, action: "" });
-
   const [showSubmissionDetail, setShowSubmissionDetail] =
     useState<Submission | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null); // Renamed to avoid collision
+  const [loadError, setLoadError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -238,7 +237,6 @@ export default function AdminDashboard() {
         <p className="text-slate-500 font-medium">Loading Dashboard...</p>
       </div>
     );
-
   if (loadError)
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-slate-50">
@@ -254,7 +252,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 font-sans text-slate-900">
-      {/* --- Header --- */}
       <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -271,6 +268,13 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <a
+              href="/"
+              className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
+              title="Go Home"
+            >
+              <Home className="w-5 h-5" />
+            </a>
             <button
               onClick={() => fetchData(true)}
               className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
@@ -291,7 +295,6 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* --- Navigation Tabs --- */}
         <div className="flex items-center gap-2 mb-8 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm w-fit">
           {[
             { id: "dashboard", label: "Overview", icon: BarChart3 },
@@ -312,17 +315,13 @@ export default function AdminDashboard() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all
-                ${
-                  activeTab === tab.id
-                    ? "bg-slate-900 text-white shadow-md"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                }
-              `}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === tab.id
+                  ? "bg-slate-900 text-white shadow-md"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              }`}
             >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
+              <tab.icon className="w-4 h-4" /> {tab.label}{" "}
               {tab.count !== undefined && tab.count > 0 && (
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full ${
@@ -339,7 +338,6 @@ export default function AdminDashboard() {
         </div>
 
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* --- DASHBOARD TAB --- */}
           {activeTab === "dashboard" && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[
@@ -389,7 +387,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* --- VENDORS TAB --- */}
           {activeTab === "vendors" && (
             <div className="grid gap-4">
               {vendors.length === 0 ? (
@@ -423,13 +420,18 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-3">
-                      {v["NDA View URL"] && (
+                    <div className="flex gap-3 z-10 relative">
+                      {/* Z-Index fix: Ensure buttons are clickable */}
+                      {(v["NDA View URL"] || v["NDA Cloudinary URL"]) && (
                         <button
-                          onClick={() => setShowNdaPreview(v["NDA View URL"]!)}
-                          className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700"
+                          onClick={() =>
+                            setShowNdaPreview(
+                              v["NDA View URL"] || v["NDA Cloudinary URL"]!
+                            )
+                          }
+                          className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-2"
                         >
-                          View NDA
+                          <Eye className="w-4 h-4" /> NDA
                         </button>
                       )}
                       <button
@@ -451,7 +453,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* --- SUBMISSIONS TAB --- */}
           {activeTab === "submissions" && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row gap-4">
@@ -480,7 +481,6 @@ export default function AdminDashboard() {
                   </select>
                 </div>
               </div>
-
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
@@ -509,7 +509,7 @@ export default function AdminDashboard() {
                           colSpan={5}
                           className="px-6 py-12 text-center text-slate-500"
                         >
-                          No submissions found matching your filters.
+                          No submissions found.
                         </td>
                       </tr>
                     ) : (
@@ -517,7 +517,7 @@ export default function AdminDashboard() {
                         <tr
                           key={s.id}
                           onClick={() => setShowSubmissionDetail(s)}
-                          className="hover:bg-slate-50 cursor-pointer transition-colors"
+                          className="hover:bg-slate-50 cursor-pointer transition-colors group"
                         >
                           <td className="px-6 py-4">
                             <p className="font-bold text-slate-900">
@@ -553,7 +553,7 @@ export default function AdminDashboard() {
                             <StatusBadge status={s.status} />
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <button className="text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center gap-1">
+                            <button className="text-indigo-600 group-hover:text-indigo-800 font-medium inline-flex items-center gap-1 transition-colors">
                               View <ChevronRight className="w-4 h-4" />
                             </button>
                           </td>
@@ -566,7 +566,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* --- QUESTIONS TAB --- */}
           {activeTab === "questions" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 min-h-[500px]">
               <div className="flex items-center gap-3 mb-6">
@@ -581,11 +580,10 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {/* --- SUBMISSION MODAL (PREMIUM) --- */}
+      {/* --- SUBMISSION MODAL (FULL DETAILS) --- */}
       {showSubmissionDetail && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
-            {/* Modal Header */}
             <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-white rounded-t-2xl">
               <div className="flex gap-4">
                 <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 font-bold text-xl">
@@ -615,10 +613,7 @@ export default function AdminDashboard() {
                 <X className="w-6 h-6" />
               </button>
             </div>
-
-            {/* Modal Content */}
             <div className="flex-1 overflow-y-auto p-8 space-y-10 bg-slate-50/50">
-              {/* 1. Solution */}
               <section>
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                   <Target className="w-4 h-4" /> Solution Overview
@@ -654,8 +649,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </section>
-
-              {/* 2. Technical */}
               <section>
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                   <Database className="w-4 h-4" /> Technical & Compliance
@@ -684,7 +677,6 @@ export default function AdminDashboard() {
                         ))}
                     </div>
                   </div>
-
                   <div className="flex flex-col md:flex-row gap-4">
                     <div
                       className={`flex-1 p-4 rounded-xl border flex items-center gap-3 ${
@@ -693,7 +685,7 @@ export default function AdminDashboard() {
                           : "bg-red-50 border-red-100 text-red-800"
                       }`}
                     >
-                      <Lock className="w-5 h-5" />
+                      <Lock className="w-5 h-5" />{" "}
                       <div>
                         <p className="font-bold text-sm">PCI Compliance</p>
                         <p className="text-xs opacity-80">
@@ -710,7 +702,7 @@ export default function AdminDashboard() {
                           : "bg-red-50 border-red-100 text-red-800"
                       }`}
                     >
-                      <Shield className="w-5 h-5" />
+                      <Shield className="w-5 h-5" />{" "}
                       <div>
                         <p className="font-bold text-sm">PII Compliance</p>
                         <p className="text-xs opacity-80">
@@ -723,8 +715,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </section>
-
-              {/* 3. Pricing */}
               <section>
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                   <DollarSign className="w-4 h-4" /> Financials & Timeline
@@ -751,6 +741,19 @@ export default function AdminDashboard() {
                           {showSubmissionDetail.monthlyCost || "N/A"}
                         </span>
                       </div>
+                      {showSubmissionDetail.pricingDocUrl && (
+                        <div className="pt-3 mt-3 border-t border-emerald-200">
+                          <a
+                            href={showSubmissionDetail.pricingDocUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 w-full py-2 bg-white text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition text-xs font-semibold"
+                          >
+                            <Download className="w-3 h-3" /> Download Pricing
+                            Doc
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100/50">
@@ -780,8 +783,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </section>
-
-              {/* 4. References */}
               <section>
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                   <Briefcase className="w-4 h-4" /> References
@@ -816,8 +817,6 @@ export default function AdminDashboard() {
                 </div>
               </section>
             </div>
-
-            {/* Modal Footer */}
             <div className="p-6 border-t border-slate-200 bg-white flex justify-end gap-3 rounded-b-xl">
               <button
                 onClick={() => setShowSubmissionDetail(null)}

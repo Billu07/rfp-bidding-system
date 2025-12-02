@@ -85,15 +85,30 @@ const verifyVendor = (req, res, next) => {
 // VENDOR ROUTES
 // ==========================================
 
+// ---------- 1. Register (FIXED: Restored All Fields) ----------
 app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
   try {
-    const { vendorName, contactPerson, email, password } = req.body;
+    // 1. Destructure ALL fields from the form
+    const {
+      vendorName,
+      contactPerson,
+      contactTitle,
+      email,
+      phone,
+      website,
+      country,
+      companySize,
+      services,
+      password,
+    } = req.body;
+
     const ndaFile = req.file;
 
     if (!vendorName || !email || !password || !ndaFile) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // 2. Check for duplicates
     const existing = await base("Vendors")
       .select({
         filterByFormula: `{Email} = '${email}'`,
@@ -107,20 +122,34 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
       });
     }
 
+    // 3. Upload to Cloudinary
     const cloudResult = await uploadToCloudinary(
       ndaFile.buffer,
       ndaFile.originalname
     );
+
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // 4. Create Record with ALL fields restored
     const createdRecord = await base("Vendors").create({
       "Vendor Name": vendorName,
       "Contact Person": contactPerson,
+      "Contact Title": contactTitle || "",
       Email: email,
+      Phone: phone || "",
+      Website: website || "",
+      Country: country || "",
+      "Company Size": companySize || "",
+      Services: services || "",
       "Password Hash": passwordHash,
-      "NDA Cloudinary URL": cloudResult.secure_url,
-      "NDA File Name": ndaFile.originalname,
+
+      // NDA Fields
       "NDA on File": true,
+      "NDA File Name": ndaFile.originalname,
+      "NDA Cloudinary URL": cloudResult.secure_url,
+      "NDA Cloudinary Public ID": cloudResult.public_id, // RESTORED
+      "NDA View URL": cloudResult.secure_url, // RESTORED
+
       Status: "Pending Approval",
     });
 

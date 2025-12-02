@@ -31,7 +31,13 @@ const schema = z.object({
   contactTitle: z.string().optional(),
   email: z.string().email("Invalid email address"),
   phone: z.string().optional(),
-  website: z.string().url("Invalid URL").optional().or(z.literal("")),
+  website: z
+    .string()
+    .min(1, "Website is required")
+    .refine((val) => {
+      const urlRegex = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w- ./?%&=]*)?$/;
+      return urlRegex.test(val);
+    }, "Please enter a valid website (e.g., acme.com)"),
   country: z.string().optional(),
   companySize: z
     .enum(["1-10", "11-50", "51-200", "201-500", "500+"])
@@ -427,7 +433,7 @@ export default function RegisterVendor() {
                           ? "border-red-500 ring-2 ring-red-100 bg-red-50"
                           : "border-gray-300 focus:border-blue-500 focus:ring-blue-100"
                       }`}
-                      placeholder="https://acme.com"
+                      placeholder="acme.com" // Changed from https://... to look simpler
                     />
                     {errors.website && (
                       <p className="text-sm text-red-600 flex items-center gap-1">
