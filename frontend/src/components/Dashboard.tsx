@@ -1,4 +1,3 @@
-// frontend/src/components/dashboard.tsx - SIMPLIFIED FOR SINGLE RFP
 import { useState, useEffect } from "react";
 import axios from "axios";
 import VendorQuestions from "./VendorQuestions";
@@ -20,17 +19,14 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import NavLink from "./NavLink";
 
-// Single RFP Data - Hardcoded as per requirements
 const AVIATION_RFP = {
   id: "aviation-workflow-2025",
   name: "Private Aviation Workflow Modernization",
   description:
     "Technology partner for modernizing private jet charter workflows through unified, data-driven platform",
-  deadline: "2025-12-31", // Set your actual deadline
+  deadline: "2025-12-31",
   status: "Active",
   focus: "Phase 1: Workflow Optimization",
-  scope:
-    "Client-facing and internal workflow automation, data integration, and operational efficiency",
 };
 
 export default function Dashboard() {
@@ -40,7 +36,6 @@ export default function Dashboard() {
   const [vendor, setVendor] = useState<any>(null);
   const navigate = useNavigate();
 
-  // Auth check
   useEffect(() => {
     const saved = localStorage.getItem("vendor");
     if (!saved) {
@@ -49,26 +44,44 @@ export default function Dashboard() {
     }
     const vendorData = JSON.parse(saved);
     setVendor(vendorData);
-    fetchSubmissions(vendorData.id);
-    fetchDraft(vendorData.id);
+
+    const loadData = async () => {
+      try {
+        const [subRes, draftRes] = await Promise.allSettled([
+          axios.get(`${API_BASE}/api/vendor/submissions`, {
+            headers: { "X-Vendor-Data": JSON.stringify({ id: vendorData.id }) },
+          }),
+          axios.get(`${API_BASE}/api/load-draft`, {
+            headers: { "X-Vendor-Data": JSON.stringify({ id: vendorData.id }) },
+          }),
+        ]);
+
+        if (subRes.status === "fulfilled") {
+          setSubmissions(subRes.value.data.submissions || []);
+        }
+
+        if (
+          draftRes.status === "fulfilled" &&
+          draftRes.value.data.success &&
+          draftRes.value.data.draft
+        ) {
+          setDraft({
+            lastSaved: draftRes.value.data.lastSaved,
+            data: draftRes.value.data.draft,
+          });
+        } else {
+          setDraft(null);
+        }
+      } catch (err) {
+        console.error("Dashboard data load error", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [navigate]);
 
-  const fetchSubmissions = async (vendorId: string) => {
-    try {
-      const res = await axios.get(`${API_BASE}/api/vendor/submissions`, {
-        headers: {
-          "X-Vendor-Data": JSON.stringify({ id: vendorId }),
-        },
-      });
-      setSubmissions(res.data.submissions || []);
-    } catch (err) {
-      console.error("Failed to load submissions");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Add this function to your dashboard component
   const handleDeleteDraft = async () => {
     if (
       confirm(
@@ -78,66 +91,25 @@ export default function Dashboard() {
       try {
         const vendorData = localStorage.getItem("vendor");
         if (!vendorData) return;
+        const v = JSON.parse(vendorData);
 
-        const vendor = JSON.parse(vendorData);
-
-        const response = await fetch("/api/delete-draft", {
-          method: "DELETE",
-          headers: {
-            "X-Vendor-Data": JSON.stringify({ id: vendor.id }),
-          },
+        const response = await axios.delete(`${API_BASE}/api/delete-draft`, {
+          headers: { "X-Vendor-Data": JSON.stringify({ id: v.id }) },
         });
 
-        const result = await response.json();
-
-        if (result.success) {
-          // Refresh the dashboard to remove the draft section
-          fetchDraft(vendor.id);
+        if (response.data.success) {
+          setDraft(null);
           alert("Draft deleted successfully");
-        } else {
-          throw new Error(result.error);
         }
       } catch (error) {
-        console.error("Failed to delete draft:", error);
         alert("Failed to delete draft");
       }
     }
   };
 
-  const fetchDraft = async (vendorId: string) => {
-    try {
-      const response = await fetch("/api/load-draft", {
-        headers: {
-          "X-Vendor-Data": JSON.stringify({ id: vendorId }),
-        },
-      });
-      const result = await response.json();
-      if (result.success && result.draft) {
-        setDraft({
-          lastSaved: result.lastSaved,
-          data: result.draft,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to load draft:", error);
-    }
-  };
-
-  const handleBeginSubmission = () => {
-    navigate("/submit-proposal");
-  };
-
-  const handleContinueDraft = () => {
-    navigate("/submit-proposal");
-  };
-
-  const handleViewSubmissions = () => {
-    navigate("/submissions");
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("vendor");
-    navigate("/"); // Navigate to landing page
+    navigate("/");
   };
 
   if (loading) {
@@ -162,7 +134,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header - Keep your existing header */}
       <header className="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -185,42 +156,33 @@ export default function Dashboard() {
                   to="/dashboard"
                   className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center gap-2"
                 >
-                  <BarChart3 className="w-4 h-4" />
-                  Dashboard
+                  <BarChart3 className="w-4 h-4" /> Dashboard
                 </NavLink>
                 <NavLink
                   to="/submissions"
                   className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center gap-2"
                 >
-                  <FileText className="w-4 h-4" />
-                  My Submissions
+                  <FileText className="w-4 h-4" /> Submissions
                 </NavLink>
                 <a
                   href="/"
                   className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center gap-2 text-gray-600 hover:text-blue-600"
                 >
-                  <Eye className="w-4 h-4" />
-                  Back to Home
+                  <Eye className="w-4 h-4" /> Home
                 </a>
               </nav>
             </div>
-
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition"
+            >
+              <LogOut className="w-4 h-4" /> Logout
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content - SIMPLIFIED FOR SINGLE RFP */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
             <div className="flex items-center gap-4">
@@ -235,7 +197,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
             <div className="flex items-center gap-4">
               <div
@@ -259,7 +220,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -275,7 +235,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Single RFP Card */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-8 mb-8">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
             <div className="flex-1">
@@ -290,11 +249,9 @@ export default function Dashboard() {
                   <p className="text-gray-600">{AVIATION_RFP.focus}</p>
                 </div>
               </div>
-
               <p className="text-gray-600 mb-4 leading-relaxed">
                 {AVIATION_RFP.description}
               </p>
-
               <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-blue-600" />
@@ -314,52 +271,44 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 min-w-[200px]">
               {draft ? (
                 <>
                   <button
-                    onClick={handleContinueDraft}
-                    className="w-full py-3 bg-yellow-500 text-white font-semibold rounded-xl hover:bg-yellow-600 transition flex items-center justify-center gap-2 mb-2"
+                    onClick={() => navigate("/submit-proposal")}
+                    className="w-full py-3 bg-yellow-500 text-white font-semibold rounded-xl hover:bg-yellow-600 transition flex items-center justify-center gap-2 mb-2 shadow-sm"
                   >
-                    <Edit className="w-4 h-4" />
-                    Continue Draft
+                    <Edit className="w-4 h-4" /> Continue Draft
                   </button>
                   <button
                     onClick={handleDeleteDraft}
-                    className="w-full py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2"
+                    className="w-full py-2 bg-white text-red-600 border border-red-200 text-sm font-semibold rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-2"
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Draft
+                    <Trash2 className="w-4 h-4" /> Discard Draft
                   </button>
-                  <p className="text-sm text-gray-500 text-center mt-2">
-                    Last saved:{" "}
-                    {format(new Date(draft.lastSaved), "MMM d, h:mm a")}
+                  <p className="text-xs text-gray-500 text-center mt-1">
+                    Saved: {format(new Date(draft.lastSaved), "MMM d, h:mm a")}
                   </p>
                 </>
               ) : (
                 <button
-                  onClick={handleBeginSubmission}
+                  onClick={() => navigate("/submit-proposal")}
                   className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transform hover:scale-105 transition-all flex items-center gap-2"
                 >
-                  <FileText className="w-4 h-4" />
-                  Begin 5-Step Submission
+                  <FileText className="w-4 h-4" /> Begin Submission
                 </button>
               )}
-
               {submissions.length > 0 && (
                 <button
-                  onClick={handleViewSubmissions}
+                  onClick={() => navigate("/submissions")}
                   className="px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition flex items-center gap-2"
                 >
-                  <Eye className="w-4 h-4" />
-                  View Submissions ({submissions.length})
+                  <Eye className="w-4 h-4" /> History ({submissions.length})
                 </button>
               )}
             </div>
           </div>
 
-          {/* Scope & Requirements */}
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">
               Project Scope
@@ -391,40 +340,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        {submissions.length > 0 && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Your Submissions
-            </h3>
-            <div className="space-y-3">
-              {submissions.map((submission) => (
-                <div
-                  key={submission.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      Submitted{" "}
-                      {format(new Date(submission.submittedAt), "MMM d, yyyy")}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Status: {submission.status}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => navigate(`/submissions/${submission.id}`)}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition"
-                  >
-                    View Details
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Q&A Section - ADD THIS RIGHT HERE */}
+        {/* Q&A Section - This ensures questions render */}
         <div className="mb-8">
           <VendorQuestions />
         </div>
