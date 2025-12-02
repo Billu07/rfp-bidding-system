@@ -122,7 +122,6 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
       "NDA File Name": ndaFile.originalname,
       "NDA on File": true,
       Status: "Pending Approval",
-      "Date Added": new Date().toISOString(),
     });
 
     res.json({
