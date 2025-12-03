@@ -33,8 +33,17 @@ app.use(
       "http://localhost:5173",
     ],
     credentials: true,
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Vendor-Data",
+      "X-Requested-With",
+    ],
   })
 );
+
+app.options("*", cors());
+
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -85,10 +94,9 @@ const verifyVendor = (req, res, next) => {
 // VENDOR ROUTES
 // ==========================================
 
-// ---------- 1. Register (FIXED: Restored All Fields) ----------
+// ---------- 1. Register ----------
 app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
   try {
-    // 1. Destructure ALL fields from the form
     const {
       vendorName,
       contactPerson,
@@ -108,7 +116,6 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // 2. Check for duplicates
     const existing = await base("Vendors")
       .select({
         filterByFormula: `{Email} = '${email}'`,
@@ -122,7 +129,6 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
       });
     }
 
-    // 3. Upload to Cloudinary
     const cloudResult = await uploadToCloudinary(
       ndaFile.buffer,
       ndaFile.originalname
@@ -130,7 +136,6 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // 4. Create Record with ALL fields restored
     const createdRecord = await base("Vendors").create({
       "Vendor Name": vendorName,
       "Contact Person": contactPerson,
@@ -142,14 +147,11 @@ app.post("/api/register", upload.single("ndaFile"), async (req, res) => {
       "Company Size": companySize || "",
       Services: services || "",
       "Password Hash": passwordHash,
-
-      // NDA Fields
       "NDA on File": true,
       "NDA File Name": ndaFile.originalname,
       "NDA Cloudinary URL": cloudResult.secure_url,
-      "NDA Cloudinary Public ID": cloudResult.public_id, // RESTORED
-      "NDA View URL": cloudResult.secure_url, // RESTORED
-
+      "NDA Cloudinary Public ID": cloudResult.public_id,
+      "NDA View URL": cloudResult.secure_url,
       Status: "Pending Approval",
     });
 
@@ -215,13 +217,12 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// ---------- DRAFT ROUTES ----------
+// ---------- DRAFT ROUTES (UPDATED) ----------
 app.post("/api/save-draft", verifyVendor, async (req, res) => {
   try {
     const draftData = req.body;
     const vendorId = req.vendor.id;
 
-    // Use Filter logic for robustness
     const records = await base("Drafts").select().all();
     const existingDraft = records.find((record) => {
       const vendorField = record.fields["Vendor"];
@@ -256,8 +257,24 @@ app.post("/api/save-draft", verifyVendor, async (req, res) => {
 app.get("/api/load-draft", verifyVendor, async (req, res) => {
   try {
     const vendorId = req.vendor.id;
-    const records = await base("Drafts").select().all();
 
+    // 1. FETCH FRESH VENDOR PROFILE FROM AIRTABLE (Force Source of Truth)
+    // This ensures we get the latest Company Info, not just what's in LocalStorage
+    const vendorRecord = await base("Vendors").find(vendorId);
+    if (!vendorRecord) throw new Error("Vendor not found");
+
+    const vFields = vendorRecord.fields;
+    const vendorProfile = {
+      companyName: vFields["Vendor Name"],
+      contactPerson: vFields["Contact Person"],
+      email: vFields["Email"],
+      phone: vFields["Phone"],
+      website: vFields["Website"],
+      companyDescription: vFields["Services"], // Default description to services
+    };
+
+    // 2. Fetch Draft
+    const records = await base("Drafts").select().all();
     const draftRecord = records.find((record) => {
       const vendorField = record.fields["Vendor"];
       if (Array.isArray(vendorField) && vendorField.length > 0) {
@@ -267,13 +284,13 @@ app.get("/api/load-draft", verifyVendor, async (req, res) => {
     });
 
     if (!draftRecord) {
-      return res.json({ success: true, draft: null });
+      // Return profile even if no draft exists
+      return res.json({ success: true, draft: null, vendorProfile });
     }
 
     let parsedData = {};
     try {
       parsedData = JSON.parse(draftRecord.fields["Draft Data"] || "{}");
-      // Double parse check for Airtable stringification quirks
       if (typeof parsedData === "string") parsedData = JSON.parse(parsedData);
     } catch (e) {
       console.error("JSON Parse error for draft");
@@ -282,6 +299,7 @@ app.get("/api/load-draft", verifyVendor, async (req, res) => {
     res.json({
       success: true,
       draft: parsedData,
+      vendorProfile, // Send fresh profile data
       lastSaved: draftRecord.fields["Last Saved"],
     });
   } catch (error) {
@@ -314,8 +332,7 @@ app.delete("/api/delete-draft", verifyVendor, async (req, res) => {
   }
 });
 
-// ---------- 6. Submit Proposal (FIXED DATA MAPPING) ----------
-// ---------- 6. Submit Proposal (WITH FILE UPLOAD) ----------
+// ---------- 6. Submit Proposal ----------
 app.post(
   "/api/submit-proposal",
   verifyVendor,
@@ -323,7 +340,6 @@ app.post(
   async (req, res) => {
     try {
       const vendorId = req.vendor.id;
-      // With FormData/Multer, req.body contains text fields, req.file contains the file
       const body = req.body;
       const pricingFile = req.file;
 
@@ -332,8 +348,10 @@ app.post(
 
       const vFields = vendorRecord.fields;
 
-      // Helper to handle parsing stringified objects from FormData
       const parseField = (val) => {
+        if (typeof val === "object" && val !== null) {
+          return JSON.stringify(val);
+        }
         try {
           return typeof val === "string" &&
             (val.startsWith("{") || val.startsWith("["))
@@ -347,7 +365,6 @@ app.post(
       let pricingDocUrl = "";
       if (pricingFile) {
         try {
-          console.log("Uploading pricing document...");
           const cloudResult = await uploadToCloudinary(
             pricingFile.buffer,
             pricingFile.originalname
@@ -374,10 +391,9 @@ app.post(
         "Data Architecture": body.dataArchitecture,
         "Step 2 Questions": body.step2Questions,
 
-        // FormData sends these as strings, so we can use them directly or sanitize
         "Integration Scores": parseField(body.integrationScores),
         "Security Measures": body.securityMeasures,
-        "PCI Compliant": body.pciCompliant === "true", // FormData sends booleans as strings "true"
+        "PCI Compliant": body.pciCompliant === "true",
         "PII Compliant": body.piiCompliant === "true",
         "Step 3 Questions": body.step3Questions,
 
@@ -387,7 +403,7 @@ app.post(
         "Upfront Cost": parseFloat(body.upfrontCost) || 0,
         "Monthly Cost": body.monthlyCost,
         "Step 4 Questions": body.step4Questions,
-        "Pricing Document URL": pricingDocUrl, // <--- SAVE URL HERE
+        "Pricing Document URL": pricingDocUrl,
 
         "Reference 1": parseField(body.reference1),
         "Reference 2": parseField(body.reference2),
@@ -429,7 +445,6 @@ app.post("/api/update-submission/:id", verifyVendor, async (req, res) => {
         .json({ error: "Unauthorized to edit this submission" });
     }
 
-    // Helper for update
     const safeStringify = (val) =>
       typeof val === "object" ? JSON.stringify(val) : String(val || "");
 
@@ -476,38 +491,31 @@ app.post("/api/update-submission/:id", verifyVendor, async (req, res) => {
   }
 });
 
-// ---------- Get Vendor Submissions (FIXED: Added Costs) ----------
 app.get("/api/vendor/submissions", verifyVendor, async (req, res) => {
   try {
     const vendorId = req.vendor.id;
-
-    // Fetch all submissions
     const records = await base("Submissions")
       .select({
         sort: [{ field: "Submission Date", direction: "desc" }],
       })
       .all();
 
-    // Filter for this vendor
     const vendorSubmissions = records.filter((record) => {
       const vField = record.fields["Vendor ID"];
       return Array.isArray(vField) && vField.includes(vendorId);
     });
 
-    // Map fields - NOW INCLUDING COSTS
     const submissions = vendorSubmissions.map((r) => ({
       id: r.id,
       rfpName: r.fields["RFP Type"] || "Private Aviation RFP",
       status: r.fields["Review Status"] || "Pending",
       submittedAt: r.fields["Submission Date"],
       companyName: r.fields["Company Name"],
-
-      // Added Missing Fields:
       implementationTimeline: r.fields["Implementation Timeline"],
       upfrontCost: r.fields["Upfront Cost"]
         ? parseFloat(r.fields["Upfront Cost"])
         : 0,
-      monthlyCost: r.fields["Monthly Cost"], // Send as string/text
+      monthlyCost: r.fields["Monthly Cost"],
     }));
 
     res.json({ success: true, submissions });
@@ -541,6 +549,13 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
     } catch (e) {}
 
     const submission = {
+      // FIX: Added Company Info here to ensure edit mode gets data from DB, not LocalStorage
+      companyName: fields["Company Name"],
+      contactPerson: fields["Contact Person"],
+      email: fields["Email"],
+      phone: fields["Phone"],
+      website: fields["Website"],
+
       companyDescription: fields["Company Description"],
       clientWorkflowDescription: fields["Client Workflow Description"],
       requestCaptureDescription: fields["Request Capture Description"],
@@ -640,26 +655,22 @@ app.get("/api/admin/submissions", async (req, res) => {
         status: f["Review Status"] || "Pending",
         submittedAt: f["Submission Date"],
         adminNotes: f["Internal Notes"],
-
-        // Detailed Fields
+        companyDescription: f["Company Description"],
         clientWorkflowDescription: f["Client Workflow Description"],
         internalWorkflowDescription: f["Internal Workflow Description"],
         reportingCapabilities: f["Reporting Capabilities"],
         dataArchitecture: f["Data Architecture"],
         requestCaptureDescription: f["Request Capture Description"],
-
         integrationScores: integrationScores,
         securityMeasures: f["Security Measures"],
         pciCompliant: f["PCI Compliant"],
         piiCompliant: f["PII Compliant"],
-
         implementationTimeline: f["Implementation Timeline"],
         projectStartDate: f["Project Start Date"],
         implementationPhases: f["Implementation Phases"],
         upfrontCost: f["Upfront Cost"] ? parseFloat(f["Upfront Cost"]) : 0,
         monthlyCost: f["Monthly Cost"],
         pricingDocUrl: f["Pricing Document URL"],
-
         reference1: f["Reference 1"] ? JSON.parse(f["Reference 1"]) : {},
         reference2: f["Reference 2"] ? JSON.parse(f["Reference 2"]) : {},
         solutionFit: f["Solution Fit"],
@@ -671,13 +682,11 @@ app.get("/api/admin/submissions", async (req, res) => {
   }
 });
 
-// ---------- Admin: Get Questions (FIXED: Safe Access) ----------
 app.get("/api/admin/questions", async (req, res) => {
   try {
     const submissions = await base("Submissions").select().all();
     const questions = [];
 
-    // Pre-fetch Vendors to map names correctly
     const vendors = await base("Vendors").select().all();
     const vendorMap = {};
     vendors.forEach((v) => {
@@ -691,7 +700,6 @@ app.get("/api/admin/questions", async (req, res) => {
       const f = sub.fields;
       const company = f["Company Name"];
 
-      // Safe Vendor Lookup
       const vendorIdArr = f["Vendor ID"];
       const vendorId =
         Array.isArray(vendorIdArr) && vendorIdArr.length > 0
@@ -707,12 +715,12 @@ app.get("/api/admin/questions", async (req, res) => {
           questions.push({
             id: sub.id + step,
             submissionId: sub.id,
-            vendor: vendor, // Guaranteed object
+            vendor: vendor,
             companyName: company,
             step,
             question: q,
             answer: a,
-            askedAt: f["Submission Date"], // Use submission date as proxy if unknown
+            askedAt: f["Submission Date"],
             answeredAt: a ? lastUpdated : null,
           });
         }
@@ -784,15 +792,10 @@ app.post("/api/admin/submission-action", async (req, res) => {
   }
 });
 
-// ---------- Get Vendor Questions (ADD THIS BEFORE app.listen) ----------
 app.get("/api/vendor/questions", verifyVendor, async (req, res) => {
   try {
     const vendorId = req.vendor.id;
-
-    // Get all submissions
     const records = await base("Submissions").select().all();
-
-    // Filter for THIS vendor only
     const vendorSubmissions = records.filter((r) => {
       const vField = r.fields["Vendor ID"];
       return Array.isArray(vField) && vField.includes(vendorId);
@@ -801,8 +804,6 @@ app.get("/api/vendor/questions", verifyVendor, async (req, res) => {
     const questions = [];
     vendorSubmissions.forEach((sub) => {
       const f = sub.fields;
-
-      // Helper to extract question blocks
       const pushQ = (step, q, a, updated) => {
         if (q) {
           questions.push({

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { API_BASE } from "../config/api";
 import {
   ArrowLeft,
   ArrowRight,
@@ -226,8 +227,9 @@ export default function MultiStepSubmission() {
 
         if (submissionId) {
           setIsEditing(true);
+          // FIX: Use API_BASE
           const response = await fetch(
-            `/api/vendor/submissions/${submissionId}`,
+            `${API_BASE}/api/vendor/submissions/${submissionId}`,
             {
               headers: {
                 "Content-Type": "application/json",
@@ -242,38 +244,44 @@ export default function MultiStepSubmission() {
             }
           }
         } else {
-          const response = await fetch("/api/load-draft", {
+          // FIX: Use API_BASE
+          const response = await fetch(`${API_BASE}/api/load-draft`, {
             headers: {
               "Content-Type": "application/json",
               "X-Vendor-Data": JSON.stringify({ id: vendor.id }),
             },
           });
           const result = await response.json();
-          if (result.success && result.draft) {
-            const draft = result.draft;
-            // Handle stringified fields
-            if (typeof draft.integrationScores === "string")
-              try {
-                draft.integrationScores = JSON.parse(draft.integrationScores);
-              } catch (e) {}
-            if (typeof draft.reference1 === "string")
-              try {
-                draft.reference1 = JSON.parse(draft.reference1);
-              } catch (e) {}
-            if (typeof draft.reference2 === "string")
-              try {
-                draft.reference2 = JSON.parse(draft.reference2);
-              } catch (e) {}
+          if (result.success) {
+            // FIX: Prioritize Fresh Vendor Profile from Backend
+            if (result.vendorProfile) {
+              mergedData = { ...mergedData, ...result.vendorProfile };
+            }
 
-            mergedData = {
-              ...mergedData,
-              ...draft,
-              companyName: vendor.name,
-              contactPerson: vendor.contact,
-              email: vendor.email,
-              phone: vendor.phone,
-            };
-            setLastSaved(new Date(result.lastSaved).toLocaleString());
+            if (result.draft) {
+              const draft = result.draft;
+              // Handle stringified fields
+              if (typeof draft.integrationScores === "string")
+                try {
+                  draft.integrationScores = JSON.parse(draft.integrationScores);
+                } catch (e) {}
+              if (typeof draft.reference1 === "string")
+                try {
+                  draft.reference1 = JSON.parse(draft.reference1);
+                } catch (e) {}
+              if (typeof draft.reference2 === "string")
+                try {
+                  draft.reference2 = JSON.parse(draft.reference2);
+                } catch (e) {}
+
+              mergedData = {
+                ...mergedData,
+                ...draft,
+                // Ensure profile fields are set if draft doesn't override them explicitly
+                // (though above merge logic handles priorities)
+              };
+              setLastSaved(new Date(result.lastSaved).toLocaleString());
+            }
           }
         }
         setFormData(mergedData);
@@ -335,7 +343,8 @@ export default function MultiStepSubmission() {
         status: "draft",
       };
 
-      const response = await fetch("/api/save-draft", {
+      // FIX: Use API_BASE
+      const response = await fetch(`${API_BASE}/api/save-draft`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -377,10 +386,11 @@ export default function MultiStepSubmission() {
       if (!vendorData) throw new Error("Vendor data not found");
       const vendor = JSON.parse(vendorData);
 
+      // FIX: Use API_BASE
       const url =
         isEditing && submissionId
-          ? `/api/update-submission/${submissionId}`
-          : "/api/submit-proposal";
+          ? `${API_BASE}/api/update-submission/${submissionId}`
+          : `${API_BASE}/api/submit-proposal`;
 
       // Use FormData for File Upload
       const payload = new FormData();
@@ -405,7 +415,8 @@ export default function MultiStepSubmission() {
 
       if (result.success) {
         if (!isEditing) {
-          await fetch("/api/delete-draft", {
+          // FIX: Use API_BASE
+          await fetch(`${API_BASE}/api/delete-draft`, {
             method: "DELETE",
             headers: {
               "Content-Type": "application/json",
