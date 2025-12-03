@@ -102,7 +102,7 @@ export default function LandingPage() {
 
   // RFP CONTENT (shown after password authentication)
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white font-sans">
       {/* Guidance Popup */}
       {showGuidance && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-fadeIn">
@@ -176,17 +176,16 @@ export default function LandingPage() {
       {/* Navigation */}
       <nav className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex justify-between items-center py-3 sm:py-4">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg"></div>
-              <span className="text-xl font-bold text-gray-900">
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shrink-0"></div>
+              <span className="text-lg sm:text-xl font-bold text-gray-900 truncate max-w-[150px] sm:max-w-none">
                 Private Aviation RFP
               </span>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               {localStorage.getItem("vendor") ||
               localStorage.getItem("admin") ? (
-                // UPDATED: Better header buttons for logged-in users
                 <>
                   <a
                     href={
@@ -194,27 +193,30 @@ export default function LandingPage() {
                         ? "/admin/dashboard"
                         : "/dashboard"
                     }
-                    className="inline-flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-blue-600 font-medium transition-all duration-200 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200"
+                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 text-gray-700 hover:text-blue-600 font-medium transition-all duration-200 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200"
+                    title="Dashboard"
                   >
                     <BarChart3 className="w-4 h-4" />
-                    Dashboard
+                    <span className="hidden md:inline">Dashboard</span>
                   </a>
                   {localStorage.getItem("vendor") && (
                     <a
                       href="/submit-proposal"
-                      className="inline-flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-green-600 font-medium transition-all duration-200 hover:bg-green-50 rounded-lg border border-transparent hover:border-green-200"
+                      className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 text-gray-700 hover:text-green-600 font-medium transition-all duration-200 hover:bg-green-50 rounded-lg border border-transparent hover:border-green-200"
+                      title="New Submission"
                     >
                       <FileText className="w-4 h-4" />
-                      New Submission
+                      <span className="hidden md:inline">New Submission</span>
                     </a>
                   )}
 
                   <a
                     href="/"
-                    className="inline-flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-purple-600 font-medium transition-all duration-200 hover:bg-purple-50 rounded-lg border border-transparent hover:border-purple-200"
+                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 text-gray-700 hover:text-purple-600 font-medium transition-all duration-200 hover:bg-purple-50 rounded-lg border border-transparent hover:border-purple-200"
+                    title="View RFP"
                   >
                     <Eye className="w-4 h-4" />
-                    View RFP
+                    <span className="hidden md:inline">View RFP</span>
                   </a>
 
                   <button
@@ -224,20 +226,21 @@ export default function LandingPage() {
                       sessionStorage.removeItem("hasSeenGuidance");
                       window.location.href = "/";
                     }}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 font-medium transition-all duration-200 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200"
+                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 text-red-600 hover:text-red-700 font-medium transition-all duration-200 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200"
+                    title="Logout"
                   >
                     <LogOut className="w-4 h-4" />
-                    Logout
+                    <span className="hidden md:inline">Logout</span>
                   </button>
                 </>
               ) : (
-                // UPDATED: Better login button design
                 <a
                   href="/login"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-200 shadow-md"
+                  className="inline-flex items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-200 shadow-md text-sm sm:text-base"
                 >
                   <Lock className="w-4 h-4" />
-                  Vendor Portal
+                  <span className="hidden sm:inline">Vendor Portal</span>
+                  <span className="sm:hidden">Login</span>
                 </a>
               )}
             </div>
@@ -246,45 +249,42 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-slate-50 to-blue-50 py-20">
+      <section className="relative bg-gradient-to-br from-slate-50 to-blue-50 py-12 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center px-4 py-2 rounded-full bg-blue-100 border border-blue-200 mb-8">
+          <div className="inline-flex items-center px-4 py-2 rounded-full bg-blue-100 border border-blue-200 mb-6 sm:mb-8">
             <Shield className="h-4 w-4 text-blue-600 mr-2" />
-            <span className="text-sm font-medium text-blue-700">
+            <span className="text-xs sm:text-sm font-medium text-blue-700">
               Confidential RFP • Luxury Credit Card & Concierge Company
             </span>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-gray-900 tracking-tight leading-tight">
             Private Aviation Workflow
-            <span className="block bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="block bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mt-2 sm:mt-0">
               Modernization RFP
             </span>
           </h1>
 
-          <p className="mt-6 text-lg sm:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+          <p className="mt-6 text-base sm:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
             Seeking a technology partner to modernize private jet charter
             workflows through a unified, data-driven platform that enhances
             operational efficiency and delivers a frictionless, high-touch
             experience for both clients and internal teams.
           </p>
 
-          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-            {/* FIXED: "Begin Submission" button logic */}
+          <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center w-full sm:w-auto">
             {localStorage.getItem("vendor") ? (
-              // If vendor is logged in, go to new submission
               <a
                 href="/submit-proposal"
-                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
               >
                 Begin Submission
                 <ArrowRight className="ml-2 h-5 w-5" />
               </a>
             ) : (
-              // If not logged in, go to registration
               <a
                 href="/register"
-                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
               >
                 Begin Submission
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -295,7 +295,7 @@ export default function LandingPage() {
               !localStorage.getItem("admin") && (
                 <a
                   href="/login"
-                  className="inline-flex items-center px-8 py-4 bg-white text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-all duration-300 border border-gray-300 hover:shadow-lg"
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 bg-white text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-all duration-300 border border-gray-300 hover:shadow-lg"
                 >
                   <Lock className="mr-2 h-5 w-5" />
                   Already Registered? Login
@@ -303,10 +303,9 @@ export default function LandingPage() {
               )}
           </div>
 
-          {/* Scroll indicator for logged-in vendors */}
           {(localStorage.getItem("vendor") ||
             localStorage.getItem("admin")) && (
-            <div className="mt-12 animate-bounce">
+            <div className="mt-8 sm:mt-12 animate-bounce hidden sm:block">
               <div className="flex flex-col items-center text-blue-600">
                 <span className="text-sm font-medium mb-2">
                   Scroll to explore RFP details
@@ -320,7 +319,6 @@ export default function LandingPage() {
 
       {/* Conditional Content - Blurred for non-registered users */}
       <div className="relative">
-        {/* Blur overlay for non-registered users */}
         {!localStorage.getItem("vendor") && !localStorage.getItem("admin") && (
           <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex items-center justify-center">
             <div className="text-center max-w-md mx-auto p-8">
@@ -353,21 +351,21 @@ export default function LandingPage() {
         )}
 
         {/* YouTube Video Section */}
-        <section className="py-16 bg-white">
+        <section className="py-12 sm:py-16 bg-white">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
                 RFP Overview Video
               </h2>
               <div className="w-24 h-1 bg-gradient-to-r from-blue-600 to-purple-600 mx-auto"></div>
-              <p className="text-gray-600 mt-4 max-w-2xl mx-auto">
+              <p className="text-gray-600 mt-4 max-w-2xl mx-auto text-sm sm:text-base">
                 Watch this video to understand the project scope, requirements,
                 and submission process in detail.
               </p>
             </div>
 
             <div
-              className="bg-gray-900 rounded-2xl overflow-hidden shadow-2xl mx-auto"
+              className="bg-gray-900 rounded-2xl overflow-hidden shadow-2xl mx-auto w-full"
               style={{ maxWidth: "896px" }}
             >
               <div
@@ -384,7 +382,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="mt-6 text-center text-gray-500 text-sm">
+            <div className="mt-6 text-center text-gray-500 text-xs sm:text-sm">
               <p>
                 Video length: Approximately 4 minutes • Closed captions
                 available
@@ -402,17 +400,17 @@ export default function LandingPage() {
           }
         >
           {/* Executive Summary */}
-          <section className="py-16 bg-white">
+          <section className="py-12 sm:py-16 bg-white">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              <div className="text-center mb-10 sm:mb-12">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
                   Executive Summary
                 </h2>
                 <div className="w-24 h-1 bg-gradient-to-r from-blue-600 to-purple-600 mx-auto"></div>
               </div>
 
               <div className="prose prose-lg max-w-none text-gray-600">
-                <p className="text-xl leading-relaxed mb-6">
+                <p className="text-lg sm:text-xl leading-relaxed mb-6">
                   The purpose of this RFP is to identify and select a{" "}
                   <strong>technology partner</strong> capable of modernizing a
                   private jet charter workflow through the design and
@@ -420,13 +418,13 @@ export default function LandingPage() {
                   <strong> unified, data-driven platform</strong>.
                 </p>
 
-                <p className="text-xl leading-relaxed mb-8">
+                <p className="text-lg sm:text-xl leading-relaxed mb-8">
                   The platform should enhance operational efficiency, reduce
                   manual dependencies, and deliver a frictionless, high-touch
                   experience for both clients and internal teams.
                 </p>
 
-                <div className="grid md:grid-cols-2 gap-8 my-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 my-10 sm:my-12">
                   <div className="bg-blue-50 rounded-2xl p-6">
                     <div className="flex items-center mb-4">
                       <Users className="h-6 w-6 text-blue-600 mr-3" />
@@ -458,17 +456,17 @@ export default function LandingPage() {
           </section>
 
           {/* Current State Overview */}
-          <section className="py-16 bg-gray-50">
+          <section className="py-12 sm:py-16 bg-gray-50">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              <div className="text-center mb-10 sm:mb-12">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
                   Current State Overview
                 </h2>
                 <div className="w-24 h-1 bg-gradient-to-r from-blue-600 to-purple-600 mx-auto"></div>
               </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-8 mb-8">
-                <p className="text-yellow-800 text-lg leading-relaxed">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 sm:p-8 mb-8">
+                <p className="text-yellow-800 text-base sm:text-lg leading-relaxed">
                   The existing process supports successful flight bookings but
                   remains{" "}
                   <strong>
@@ -481,9 +479,9 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 flex items-center">
                     <MessageSquare className="h-6 w-6 text-blue-600 mr-3" />
                     Request Flow
                   </h3>
@@ -519,7 +517,7 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  <h4 className="text-xl font-semibold text-gray-900 mt-8 mb-4">
+                  <h4 className="text-lg sm:text-xl font-semibold text-gray-900 mt-8 mb-4">
                     Quoting & Booking
                   </h4>
                   <div className="space-y-3 text-gray-600">
@@ -534,7 +532,7 @@ export default function LandingPage() {
                 </div>
 
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 flex items-center">
                     <Database className="h-6 w-6 text-purple-600 mr-3" />
                     Technical Stack & Limitations
                   </h3>
@@ -555,7 +553,7 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  <h4 className="text-xl font-semibold text-gray-900 mb-4">
+                  <h4 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">
                     Key Limitations
                   </h4>
                   <div className="space-y-3">
@@ -591,14 +589,14 @@ export default function LandingPage() {
           </section>
 
           {/* Desired Future State */}
-          <section className="py-16 bg-white">
+          <section className="py-12 sm:py-16 bg-white">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              <div className="text-center mb-10 sm:mb-12">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
                   Desired Future State
                 </h2>
                 <div className="w-24 h-1 bg-gradient-to-r from-blue-600 to-purple-600 mx-auto"></div>
-                <p className="text-xl text-gray-600 mt-4 max-w-2xl mx-auto">
+                <p className="text-lg sm:text-xl text-gray-600 mt-4 max-w-2xl mx-auto">
                   The desired system should unify client-facing and internal
                   workflows into a single ecosystem—automating repetitive tasks,
                   centralizing data, and improving both client experience and
@@ -606,13 +604,13 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="grid lg:grid-cols-2 gap-8 mb-12">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 sm:p-8">
                   <div className="flex items-center mb-6">
                     <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mr-4">
                       <Users className="h-6 w-6 text-white" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
                       Client-Facing Workflows
                     </h3>
                   </div>
@@ -645,12 +643,12 @@ export default function LandingPage() {
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-8">
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 sm:p-8">
                   <div className="flex items-center mb-6">
                     <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mr-4">
                       <Workflow className="h-6 w-6 text-white" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
                       Internal Operational Workflows
                     </h3>
                   </div>
@@ -688,15 +686,15 @@ export default function LandingPage() {
               </div>
 
               {/* Phased Implementation */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-8 border border-green-200">
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 sm:p-8 border border-green-200">
                 <div className="flex items-center mb-6">
                   <Calendar className="h-6 w-6 text-green-600 mr-3" />
-                  <h3 className="text-2xl font-bold text-gray-900">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
                     Phased Implementation Approach
                   </h3>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900 mb-3">
                       Phase 1: Workflow Optimization
@@ -718,7 +716,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="mt-6 p-4 bg-white rounded-xl border border-green-200">
-                  <p className="text-green-800 font-semibold text-center">
+                  <p className="text-green-800 font-semibold text-center text-sm sm:text-base">
                     🎯 THIS RFP IS FOCUSED ON PHASE 1: WORKFLOW OPTIMIZATION
                   </p>
                 </div>
@@ -726,100 +724,15 @@ export default function LandingPage() {
             </div>
           </section>
 
-          {/* NDA Section */}
-          <section className="py-16 bg-orange-50 border-t border-orange-200">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                  Confidentiality & NDA
-                </h2>
-                <div className="w-24 h-1 bg-gradient-to-r from-orange-600 to-red-600 mx-auto"></div>
-              </div>
-
-              <div className="bg-white rounded-2xl p-8 shadow-sm border border-orange-200 text-center">
-                <div className="flex items-center mb-6 justify-center">
-                  <div className="w-12 h-12 bg-orange-600 rounded-xl flex items-center justify-center mr-4">
-                    <FileText className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold text-gray-900">
-                      Non-Disclosure Agreement
-                    </h3>
-                    <p className="text-gray-600 mt-1">
-                      Required for all vendors before registration
-                    </p>
-                  </div>
-                </div>
-
-                <div className="max-w-2xl mx-auto mb-6">
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-center">
-                      <CheckCircle className="h-5 w-5 text-green-600 mr-3 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-700">
-                        Download and review the NDA document
-                      </span>
-                    </div>
-                    <div className="flex items-start justify-center">
-                      <CheckCircle className="h-5 w-5 text-green-600 mr-3 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-700">
-                        Sign the NDA with your company details
-                      </span>
-                    </div>
-                    <div className="flex items-start justify-center">
-                      <CheckCircle className="h-5 w-5 text-green-600 mr-3 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-700">
-                        Upload the signed NDA during registration
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Updated Download Button Section */}
-                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                  <button
-                    onClick={() => {
-                      // Direct download approach
-                      const ndaUrl = "/Atlas_NDA.pdf";
-                      const link = document.createElement("a");
-                      link.href = ndaUrl;
-                      link.download = "Atlas-Aviation-RFP-NDA-Agreement.pdf";
-                      link.target = "_blank";
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }}
-                    className="inline-flex items-center px-6 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-                  >
-                    <FileText className="mr-2 h-5 w-5" />
-                    Download NDA Template
-                  </button>
-                  <a
-                    href="/register"
-                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-xl transform hover:scale-105 transition-all duration-300"
-                  >
-                    Proceed to Registration
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </a>
-                </div>
-
-                <div className="mt-6 text-center text-gray-500 text-sm">
-                  <p>
-                    NDA must be signed and uploaded during vendor registration
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
           {/* CTA Section */}
-          <section className="py-16 bg-gray-900">
+          <section className="py-12 sm:py-16 bg-gray-900">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-              <h3 className="text-3xl font-bold text-white mb-4">
+              <h3 className="text-2xl sm:text-3xl font-bold text-white mb-4">
                 {localStorage.getItem("vendor") || localStorage.getItem("admin")
                   ? "Continue Working on Your Proposal"
                   : "Ready to Submit Your Proposal?"}
               </h3>
-              <p className="text-gray-300 mb-8 text-lg max-w-2xl mx-auto">
+              <p className="text-gray-300 mb-8 text-base sm:text-lg max-w-2xl mx-auto">
                 {localStorage.getItem("vendor") || localStorage.getItem("admin")
                   ? "Return to your dashboard to manage submissions, track progress, and review vendor applications."
                   : "This RFP focuses on Phase 1: Workflow Optimization. Register as a vendor to access the detailed submission portal with multi-step capability assessment."}
@@ -834,7 +747,7 @@ export default function LandingPage() {
                           ? "/admin/dashboard"
                           : "/dashboard"
                       }
-                      className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                      className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
                     >
                       <BarChart3 className="mr-2 h-5 w-5" />
                       Go to Dashboard
@@ -845,7 +758,7 @@ export default function LandingPage() {
                           ? "/admin/submissions"
                           : "/submissions"
                       }
-                      className="inline-flex items-center px-8 py-4 bg-white text-gray-900 font-semibold rounded-xl hover:bg-gray-100 transition-all duration-300 border border-gray-300"
+                      className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 bg-white text-gray-900 font-semibold rounded-xl hover:bg-gray-100 transition-all duration-300 border border-gray-300"
                     >
                       <FileText className="mr-2 h-5 w-5" />
                       {localStorage.getItem("admin")
@@ -857,7 +770,7 @@ export default function LandingPage() {
                   <>
                     <a
                       href="/register"
-                      className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                      className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
                     >
                       <FileText className="mr-2 h-5 w-5" />
                       Begin Submission
@@ -865,7 +778,7 @@ export default function LandingPage() {
                     </a>
                     <a
                       href="/login"
-                      className="inline-flex items-center px-8 py-4 bg-white text-gray-900 font-semibold rounded-xl hover:bg-gray-100 transition-all duration-300 border border-gray-300"
+                      className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 bg-white text-gray-900 font-semibold rounded-xl hover:bg-gray-100 transition-all duration-300 border border-gray-300"
                     >
                       Vendor Login
                     </a>

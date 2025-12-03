@@ -252,25 +252,26 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 font-sans text-slate-900">
+      {/* RESPONIVE HEADER: Adjusted padding and flex alignment */}
       <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="bg-gradient-to-tr from-indigo-600 to-violet-600 p-2 rounded-lg text-white shadow-lg shadow-indigo-200">
               <Shield className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-tight text-slate-900">
+              <h1 className="font-bold text-base sm:text-lg leading-tight text-slate-900">
                 Admin Control
               </h1>
-              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+              <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
                 Workflow Modernization
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <a
               href="/"
-              className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
+              className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors hidden sm:block"
               title="Go Home"
             >
               <Home className="w-5 h-5" />
@@ -286,16 +287,18 @@ export default function AdminDashboard() {
             <div className="h-6 w-px bg-slate-200 mx-1"></div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 text-sm font-medium text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors"
+              className="flex items-center gap-2 text-sm font-medium text-red-600 hover:bg-red-50 px-2 sm:px-3 py-2 rounded-lg transition-colors"
             >
-              <LogOut className="w-4 h-4" /> Logout
+              <LogOut className="w-4 h-4" />{" "}
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center gap-2 mb-8 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm w-fit">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* RESPONSIVE TABS: Added horizontal scroll and full width on mobile */}
+        <div className="flex items-center gap-2 mb-8 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm w-full sm:w-fit overflow-x-auto no-scrollbar">
           {[
             { id: "dashboard", label: "Overview", icon: BarChart3 },
             {
@@ -315,7 +318,7 @@ export default function AdminDashboard() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
                 activeTab === tab.id
                   ? "bg-slate-900 text-white shadow-md"
                   : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
@@ -339,7 +342,8 @@ export default function AdminDashboard() {
 
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           {activeTab === "dashboard" && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            // RESPONSIVE GRID: 1 column on mobile, 2 on tablet, 4 on desktop
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {[
                 {
                   label: "Total Submissions",
@@ -400,28 +404,28 @@ export default function AdminDashboard() {
                 vendors.map((v) => (
                   <div
                     key={v.id}
-                    className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6"
+                    className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold text-lg">
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                      <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold text-lg shrink-0">
                         {v["Vendor Name"].charAt(0)}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-lg text-slate-900">
+                      <div className="overflow-hidden">
+                        <h3 className="font-bold text-lg text-slate-900 truncate">
                           {v["Vendor Name"]}
                         </h3>
-                        <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
-                          <span className="flex items-center gap-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-slate-500 mt-1">
+                          <span className="flex items-center gap-1 truncate">
                             <Users className="w-3 h-3" /> {v["Contact Person"]}
                           </span>
-                          <span className="flex items-center gap-1">
+                          <span className="flex items-center gap-1 truncate">
                             <Mail className="w-3 h-3" /> {v.Email}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-3 z-10 relative">
-                      {/* Z-Index fix: Ensure buttons are clickable */}
+                    {/* RESPONSIVE BUTTONS: Wrap on small screens, full width on mobile */}
+                    <div className="flex flex-wrap gap-3 z-10 relative w-full md:w-auto">
                       {(v["NDA View URL"] || v["NDA Cloudinary URL"]) && (
                         <button
                           onClick={() =>
@@ -429,20 +433,20 @@ export default function AdminDashboard() {
                               v["NDA View URL"] || v["NDA Cloudinary URL"]!
                             )
                           }
-                          className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-2"
+                          className="flex-1 md:flex-none justify-center px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-2"
                         >
                           <Eye className="w-4 h-4" /> NDA
                         </button>
                       )}
                       <button
                         onClick={() => handleVendorAction(v.id, "approve")}
-                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"
+                        className="flex-1 md:flex-none justify-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"
                       >
                         Approve
                       </button>
                       <button
                         onClick={() => handleVendorAction(v.id, "decline")}
-                        className="px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-sm font-medium"
+                        className="flex-1 md:flex-none justify-center px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-sm font-medium"
                       >
                         Decline
                       </button>
@@ -469,7 +473,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3">
                   <Filter className="w-4 h-4 text-slate-400" />
                   <select
-                    className="py-2.5 bg-transparent outline-none text-sm text-slate-700 font-medium"
+                    className="py-2.5 bg-transparent outline-none text-sm text-slate-700 font-medium w-full sm:w-auto"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
                   >
@@ -481,8 +485,9 @@ export default function AdminDashboard() {
                   </select>
                 </div>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <table className="w-full text-left text-sm">
+              {/* RESPONSIVE TABLE: Added overflow-x-auto to wrapper */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
+                <table className="w-full text-left text-sm min-w-[800px]">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
                       <th className="px-6 py-4 font-semibold text-slate-600">
@@ -567,7 +572,7 @@ export default function AdminDashboard() {
           )}
 
           {activeTab === "questions" && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 min-h-[500px]">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 min-h-[500px]">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
                   <MessageSquare className="w-6 h-6" />
@@ -583,22 +588,23 @@ export default function AdminDashboard() {
       {/* --- SUBMISSION MODAL (FULL DETAILS) --- */}
       {showSubmissionDetail && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-white rounded-t-2xl">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] sm:h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
+            {/* RESPONSIVE HEADER IN MODAL */}
+            <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-start bg-white rounded-t-2xl">
               <div className="flex gap-4">
-                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 font-bold text-xl">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 font-bold text-lg sm:text-xl shrink-0">
                   {showSubmissionDetail.companyName.charAt(0)}
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900">
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 line-clamp-1">
                     {showSubmissionDetail.companyName}
                   </h2>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1 text-sm text-slate-500">
                     <span className="flex items-center gap-1.5">
                       <Users className="w-4 h-4" />{" "}
                       {showSubmissionDetail.contactPerson}
                     </span>
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1.5 hidden sm:flex">
                       <Calendar className="w-4 h-4" />{" "}
                       {safeFormatDate(showSubmissionDetail.submittedAt)}
                     </span>
@@ -613,7 +619,8 @@ export default function AdminDashboard() {
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-8 space-y-10 bg-slate-50/50">
+            {/* CONTENT AREA */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 sm:space-y-10 bg-slate-50/50">
               <section>
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                   <Target className="w-4 h-4" /> Solution Overview
@@ -817,10 +824,11 @@ export default function AdminDashboard() {
                 </div>
               </section>
             </div>
-            <div className="p-6 border-t border-slate-200 bg-white flex justify-end gap-3 rounded-b-xl">
+            {/* RESPONSIVE FOOTER: Stack buttons on very small screens if needed */}
+            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white flex flex-wrap justify-end gap-3 rounded-b-xl">
               <button
                 onClick={() => setShowSubmissionDetail(null)}
-                className="px-5 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition"
+                className="px-5 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition w-full sm:w-auto"
               >
                 Close
               </button>
@@ -832,7 +840,7 @@ export default function AdminDashboard() {
                     action: "shortlist",
                   })
                 }
-                className="px-5 py-2.5 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition"
+                className="px-5 py-2.5 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition w-full sm:w-auto"
               >
                 Shortlist
               </button>
@@ -844,7 +852,7 @@ export default function AdminDashboard() {
                     action: "approve",
                   })
                 }
-                className="px-5 py-2.5 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 shadow-md shadow-emerald-200 transition"
+                className="px-5 py-2.5 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 shadow-md shadow-emerald-200 transition w-full sm:w-auto"
               >
                 Approve
               </button>
@@ -856,7 +864,7 @@ export default function AdminDashboard() {
       {/* --- ACTION CONFIRMATION MODAL --- */}
       {showSubmissionModal.show && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md animate-in zoom-in-95 duration-200">
+          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-md animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-bold capitalize text-slate-900 mb-2">
               {showSubmissionModal.action} Submission?
             </h3>

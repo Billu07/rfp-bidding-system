@@ -133,20 +133,21 @@ export default function Dashboard() {
   const isUrgent = daysLeft <= 7 && daysLeft > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 font-sans">
+      {/* RESPONSIVE HEADER */}
       <header className="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-8">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Target className="w-5 h-5 text-white" />
+            <div className="flex items-center gap-4 sm:space-x-8">
+              <div className="flex items-center gap-2 sm:space-x-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
+                  <Target className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight">
                     Vendor Portal
                   </h1>
-                  <p className="text-xs text-gray-500 font-medium">
+                  <p className="text-[10px] sm:text-xs text-gray-500 font-medium">
                     Welcome back, {vendor?.name}
                   </p>
                 </div>
@@ -172,21 +173,24 @@ export default function Dashboard() {
                 </a>
               </nav>
             </div>
+            {/* Mobile Logout - Icon only on small screens */}
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition"
+              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 px-2 sm:px-3 py-2 rounded-lg hover:bg-gray-100 transition"
             >
-              <LogOut className="w-4 h-4" /> Logout
+              <LogOut className="w-4 h-4" />{" "}
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {/* STATS GRID - 1 col on mobile, 3 on desktop */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-5 sm:p-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
                 <FileText className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -197,14 +201,14 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-5 sm:p-6">
             <div className="flex items-center gap-4">
               <div
                 className={`w-12 h-12 bg-gradient-to-r ${
                   isUrgent
                     ? "from-orange-500 to-orange-600"
                     : "from-green-500 to-green-600"
-                } rounded-xl flex items-center justify-center shadow-lg`}
+                } rounded-xl flex items-center justify-center shadow-lg shrink-0`}
               >
                 <Clock className="w-6 h-6 text-white" />
               </div>
@@ -220,9 +224,9 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-5 sm:p-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
                 <Zap className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -235,34 +239,37 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-8 mb-8">
+        {/* MAIN RFP CARD */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-5 sm:p-8 mb-8">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-                  <Target className="w-6 h-6 text-white" />
+              <div className="flex items-start sm:items-center gap-3 mb-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shrink-0">
+                  <Target className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
                     {AVIATION_RFP.name}
                   </h2>
-                  <p className="text-gray-600">{AVIATION_RFP.focus}</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {AVIATION_RFP.focus}
+                  </p>
                 </div>
               </div>
-              <p className="text-gray-600 mb-4 leading-relaxed">
+              <p className="text-sm sm:text-base text-gray-600 mb-4 leading-relaxed">
                 {AVIATION_RFP.description}
               </p>
-              <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap gap-3 sm:gap-4 text-sm text-gray-600">
+                <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-md">
                   <Calendar className="w-4 h-4 text-blue-600" />
                   <span>Due {format(deadline, "MMM d, yyyy")}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-md">
                   <CheckCircle className="w-4 h-4 text-green-600" />
                   <span>{AVIATION_RFP.status}</span>
                 </div>
                 {isUrgent && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-orange-50 px-2 py-1 rounded-md">
                     <Clock className="w-4 h-4 text-orange-600" />
                     <span className="text-orange-600 font-semibold">
                       Urgent: {daysLeft} days left
@@ -271,7 +278,9 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-            <div className="flex flex-col gap-3 min-w-[200px]">
+
+            {/* ACTION BUTTONS: Full width on mobile */}
+            <div className="flex flex-col gap-3 w-full lg:w-auto lg:min-w-[200px]">
               {draft ? (
                 <>
                   <button
@@ -293,7 +302,7 @@ export default function Dashboard() {
               ) : (
                 <button
                   onClick={() => navigate("/submit-proposal")}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transform hover:scale-105 transition-all flex items-center gap-2"
+                  className="w-full lg:w-auto px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transform hover:scale-105 transition-all flex items-center justify-center gap-2"
                 >
                   <FileText className="w-4 h-4" /> Begin Submission
                 </button>
@@ -301,7 +310,7 @@ export default function Dashboard() {
               {submissions.length > 0 && (
                 <button
                   onClick={() => navigate("/submissions")}
-                  className="px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition flex items-center gap-2"
+                  className="w-full lg:w-auto px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition flex items-center justify-center gap-2"
                 >
                   <Eye className="w-4 h-4" /> History ({submissions.length})
                 </button>
@@ -313,7 +322,8 @@ export default function Dashboard() {
             <h3 className="text-lg font-semibold text-gray-900 mb-3">
               Project Scope
             </h3>
-            <div className="grid md:grid-cols-2 gap-6">
+            {/* PROJECT SCOPE GRID: 1 col mobile, 2 col desktop */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-blue-50 rounded-xl p-4">
                 <h4 className="font-semibold text-blue-900 mb-2">
                   Client-Facing Workflows
