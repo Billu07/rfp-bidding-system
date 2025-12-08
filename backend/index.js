@@ -616,18 +616,43 @@ app.get("/api/admin/pending-vendors", async (req, res) => {
   }
 });
 
+// ---------- UPDATED ROUTE: /api/admin/vendor-action ----------
 app.post("/api/admin/vendor-action", async (req, res) => {
   const { vendorId, action } = req.body;
+  const N8N_URL =
+    process.env.N8N_WEBHOOK_URL ||
+    "https://jettocabo.app.n8n.cloud/webhook/webhook/vendor-action";
+
   try {
     const newStatus = action === "approve" ? "Approved" : "Declined";
-    await base("Vendors").update(vendorId, {
+
+    const updatedRecord = await base("Vendors").update(vendorId, {
       Status: newStatus,
       "Approval Date": new Date().toISOString().split("T")[0],
       "Approved By":
         action === "approve" ? process.env.ADMIN_EMAIL || "Admin" : null,
     });
+
+    try {
+      await axios.post(N8N_URL, {
+        vendorId: vendorId,
+        vendorName: updatedRecord.fields["Vendor Name"],
+        email: updatedRecord.fields["Email"],
+        status: newStatus,
+        action: action,
+        adminNote: "Processed via Admin Dashboard",
+        timestamp: new Date().toISOString(),
+      });
+      console.log(
+        `n8n webhook triggered for ${updatedRecord.fields["Vendor Name"]} (${newStatus})`
+      );
+    } catch (webhookError) {
+      console.error("Failed to trigger n8n webhook:", webhookError.message);
+    }
+
     res.json({ success: true, message: `Vendor ${newStatus.toLowerCase()}` });
   } catch (error) {
+    console.error("Vendor action error:", error);
     res.status(500).json({ error: "Action failed" });
   }
 });
