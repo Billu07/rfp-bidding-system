@@ -58,11 +58,15 @@ const upload = multer({
 const uploadToCloudinary = (fileBuffer, fileName) => {
   return new Promise((resolve, reject) => {
     const { Readable } = require("stream");
+
+    // FIX: Trim whitespace after removing the file extension
+    const cleanPublicId = fileName.replace(/\.[^/.]+$/, "").trim();
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         resource_type: "raw",
         folder: "rfp-nda-documents",
-        public_id: fileName.replace(/\.[^/.]+$/, ""),
+        public_id: cleanPublicId,
         format: "pdf",
       },
       (error, result) => {
@@ -375,6 +379,14 @@ app.post(
         }
       }
 
+      // FIX 3: Robust number parsing
+      // This strips non-numeric chars (like '$' or 'k') before parsing.
+      // If body.upfrontCost is "1000", it works. If it's "1k", it becomes 1.
+      // If it's undefined, it becomes 0.
+      const cleanUpfrontCost = body.upfrontCost
+        ? parseFloat(String(body.upfrontCost).replace(/[^0-9.]/g, "")) || 0
+        : 0;
+
       const submissionData = {
         "Vendor ID": [vendorId],
         "Company Name": vFields["Vendor Name"],
@@ -400,7 +412,8 @@ app.post(
         "Implementation Timeline": body.implementationTimeline,
         "Project Start Date": body.projectStartDate,
         "Implementation Phases": body.implementationPhases,
-        "Upfront Cost": parseFloat(body.upfrontCost) || 0,
+
+        "Upfront Cost": cleanUpfrontCost, // Uses the cleaned value
         "Monthly Cost": body.monthlyCost,
         "Step 4 Questions": body.step4Questions,
         "Pricing Document URL": pricingDocUrl,
@@ -448,6 +461,11 @@ app.post("/api/update-submission/:id", verifyVendor, async (req, res) => {
     const safeStringify = (val) =>
       typeof val === "object" ? JSON.stringify(val) : String(val || "");
 
+    // FIX 4: Robust number parsing for update
+    const cleanUpfrontCost = body.upfrontCost
+      ? parseFloat(String(body.upfrontCost).replace(/[^0-9.]/g, "")) || 0
+      : 0;
+
     const updateData = {
       "Client Workflow Description": body.clientWorkflowDescription,
       "Request Capture Description": body.requestCaptureDescription,
@@ -465,7 +483,8 @@ app.post("/api/update-submission/:id", verifyVendor, async (req, res) => {
       "Implementation Timeline": body.implementationTimeline,
       "Project Start Date": body.projectStartDate,
       "Implementation Phases": body.implementationPhases,
-      "Upfront Cost": parseFloat(body.upfrontCost) || 0,
+
+      "Upfront Cost": cleanUpfrontCost, // Uses cleaned value
       "Monthly Cost": body.monthlyCost,
       "Step 4 Questions": body.step4Questions,
 
@@ -487,6 +506,7 @@ app.post("/api/update-submission/:id", verifyVendor, async (req, res) => {
       submissionId: submissionId,
     });
   } catch (error) {
+    console.error("Update error:", error);
     res.status(500).json({ error: "Update failed" });
   }
 });
@@ -537,19 +557,36 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
 
     const fields = record.fields;
 
-    let integrationScores, ref1, ref2;
+    // FIX 1: Initialize these with empty objects so they are never 'undefined'
+    // If they remain undefined, JSON.stringify removes them, breaking the frontend checkboxes.
+    let integrationScores = {};
+    let ref1 = {};
+    let ref2 = {};
+
     try {
-      integrationScores = JSON.parse(fields["Integration Scores"] || "{}");
+      if (fields["Integration Scores"]) {
+        const raw = fields["Integration Scores"];
+        integrationScores = typeof raw === "object" ? raw : JSON.parse(raw);
+      }
+    } catch (e) {
+      console.log("Error parsing integration scores", e);
+    }
+
+    try {
+      if (fields["Reference 1"]) {
+        const raw = fields["Reference 1"];
+        ref1 = typeof raw === "object" ? raw : JSON.parse(raw);
+      }
     } catch (e) {}
+
     try {
-      ref1 = JSON.parse(fields["Reference 1"] || "{}");
-    } catch (e) {}
-    try {
-      ref2 = JSON.parse(fields["Reference 2"] || "{}");
+      if (fields["Reference 2"]) {
+        const raw = fields["Reference 2"];
+        ref2 = typeof raw === "object" ? raw : JSON.parse(raw);
+      }
     } catch (e) {}
 
     const submission = {
-      // FIX: Added Company Info here to ensure edit mode gets data from DB, not LocalStorage
       companyName: fields["Company Name"],
       contactPerson: fields["Contact Person"],
       email: fields["Email"],
@@ -564,6 +601,7 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
       dataArchitecture: fields["Data Architecture"],
       step2Questions: fields["Step 2 Questions"],
 
+      // Now guaranteed to be an object (empty or populated)
       integrationScores: integrationScores,
       securityMeasures: fields["Security Measures"],
       pciCompliant: fields["PCI Compliant"],
@@ -573,7 +611,12 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
       implementationTimeline: fields["Implementation Timeline"],
       projectStartDate: fields["Project Start Date"],
       implementationPhases: fields["Implementation Phases"],
-      upfrontCost: fields["Upfront Cost"],
+
+      // FIX 2: Ensure we return a value, even if 0 or null, converted to string for consistency
+      upfrontCost:
+        fields["Upfront Cost"] !== undefined
+          ? String(fields["Upfront Cost"])
+          : "",
       monthlyCost: fields["Monthly Cost"],
       step4Questions: fields["Step 4 Questions"],
 
@@ -586,6 +629,7 @@ app.get("/api/vendor/submissions/:id", verifyVendor, async (req, res) => {
 
     res.json({ success: true, submission });
   } catch (error) {
+    console.error("Load submission error:", error);
     res.status(500).json({ error: "Failed to load submission" });
   }
 });
